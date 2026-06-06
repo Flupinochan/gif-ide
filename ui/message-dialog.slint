@@ -1,0 +1,36 @@
+import { ScrollView, StandardButton } from "std-widgets.slint";
+import { AppStyle } from "global-styles.slint";
+
+export component MessageDialog inherits Dialog {
+    in property <string> title-text;
+    in property <string> message;
+    callback ok-clicked();
+
+    default-font-size: AppStyle.font-size;
+    always-on-top: true;
+    preferred-width: 500px;
+    padding: 16px;
+    title: title-text;
+
+    VerticalLayout {
+        padding-bottom: 10px;
+
+        ScrollView {
+            preferred-height: min(msg-text.preferred-height, 200px);
+            viewport-height: msg-text.preferred-height;
+
+            msg-text := Text {
+                text: message;
+                wrap: word-wrap;
+                width: parent.visible-width - 16px;
+            }
+        }
+    }
+
+    StandardButton {
+        kind: ok;
+        clicked => {
+            root.ok-clicked();
+        }
+    }
+}

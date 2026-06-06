@@ -1,0 +1,39 @@
+import {
+    Button,
+    VerticalBox,
+    Spinner,
+} from "std-widgets.slint";
+import { AppStyle } from "global-styles.slint";
+export { MessageDialog } from "message-dialog.slint";
+
+export component AppWindow inherits Window {
+    default-font-size: AppStyle.font-size;
+    in property <image> gif-image;
+    in property <int> gif-frame-count;
+    in property <bool> is-loading: false;
+    callback pick-gif();
+
+    VerticalBox {
+        padding: 16px;
+        spacing: 12px;
+
+        if !is-loading: Button {
+            text: "Pick GIF";
+            clicked => {
+                root.pick-gif();
+            }
+        }
+
+        if is-loading: Spinner {
+            indeterminate: true;
+        }
+
+        if gif-frame-count > 0: Text {
+            text: "フレーム数: " + gif-frame-count;
+        }
+
+        if gif-image.width > 0: Image {
+            source: gif-image;
+        }
+    }
+}

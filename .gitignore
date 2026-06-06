@@ -1,0 +1,15 @@
+/target
+
+# Claude Code
+*.stackdump
+
+# Windows
+Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Editor
+*.swp
+*.swo
+*~
+.DS_Store
