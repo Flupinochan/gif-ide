@@ -20,7 +20,6 @@ pub struct GifFile {
 }
 
 pub trait Gif {
-    fn frame_count(&self) -> usize;
     fn frames(&self) -> &[GifFrame];
     fn frame_image(&self, index: usize) -> Option<Image>;
 }
@@ -53,10 +52,6 @@ impl GifFile {
 }
 
 impl Gif for GifFile {
-    fn frame_count(&self) -> usize {
-        self.frames.len()
-    }
-
     fn frames(&self) -> &[GifFrame] {
         &self.frames
     }

@@ -72,9 +72,6 @@ fn main() -> Result<()> {
             ui.set_is_loading(false);
             match result {
                 Ok(gif_file) => {
-                    // フレーム数更新
-                    ui.set_gif_frame_count(gif_file.frame_count() as i32);
-
                     if let Some(image) = gif_file.frame_image(0) {
                         // メイン画像更新
                         ui.set_gif_image(image);
@@ -82,7 +79,7 @@ fn main() -> Result<()> {
                         ui.set_selected_frame_index(0);
                     }
 
-                    let frame_images: Vec<slint::Image> = (0..gif_file.frame_count())
+                    let frame_images: Vec<slint::Image> = (0..gif_file.frames().len())
                         .filter_map(|i| gif_file.frame_image(i))
                         .collect();
                     let frames_model = Rc::new(VecModel::from(frame_images));

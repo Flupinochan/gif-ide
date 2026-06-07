@@ -11,10 +11,10 @@ export { MessageDialog } from "message-dialog.slint";
 
 export component AppWindow inherits Window {
     in property <image> gif-image;
-    in property <int> gif-frame-count: 0;
+    in property <int> gif-frame-count: frames.length;
     in property <bool> is-loading: false;
     in-out property <int> current-tab: 0;
-    in-out property <[image]> frames;
+    in-out property <[image]> frames: [];
     in-out property <int> selected-frame-index: 0;
     callback pick-gif();
     callback show-test-dialog();
