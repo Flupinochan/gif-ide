@@ -46,8 +46,9 @@ fn main() -> Result<()> {
     let _guard = rt.enter();
 
     let ui = AppWindow::new()?;
-    let ui_weak = ui.as_weak();
 
+    // 画面最大化
+    let ui_weak = ui.as_weak();
     slint::invoke_from_event_loop(move || {
         if let Some(ui) = ui_weak.upgrade() {
             ui.window().set_maximized(true);
@@ -55,6 +56,7 @@ fn main() -> Result<()> {
     })
     .unwrap();
 
+    // GIFファイル選択Callback
     let ui_weak = ui.as_weak();
     ui.on_pick_gif(move || {
         let Some(path_buf) = pick_gif_file() else {
@@ -70,10 +72,13 @@ fn main() -> Result<()> {
             ui.set_is_loading(false);
             match result {
                 Ok(gif_file) => {
+                    // フレーム数更新
                     ui.set_gif_frame_count(gif_file.frame_count() as i32);
 
                     if let Some(image) = gif_file.frame_image(0) {
+                        // メイン画像更新
                         ui.set_gif_image(image);
+                        // 選択中のフレームのインデックス更新
                         ui.set_selected_frame_index(0);
                     }
 
@@ -82,12 +87,34 @@ fn main() -> Result<()> {
                         .collect();
                     let frames_model = Rc::new(VecModel::from(frame_images));
                     let frames_model_ref = frames_model.clone();
+                    let frames_model_for_skip = frames_model_ref.clone();
+                    let frames_model_for_back = frames_model_for_skip.clone();
+                    // フレームタイムライン更新
                     ui.set_frames(ModelRc::from(frames_model));
 
+                    // フレームタイムライン選択Callback
                     let ui_weak_for_frame = ui.as_weak();
                     ui.on_frame_selected(move |index| {
                         if let Some(image) = frames_model_ref.row_data(index as usize) {
                             if let Some(ui) = ui_weak_for_frame.upgrade() {
+                                ui.set_gif_image(image);
+                            }
+                        }
+                    });
+                    // skip-back buttonクリック時Callback
+                    let ui_weak_for_back = ui.as_weak();
+                    ui.on_skip_back(move |index| {
+                        if let Some(image) = frames_model_for_back.row_data(index as usize) {
+                            if let Some(ui) = ui_weak_for_back.upgrade() {
+                                ui.set_gif_image(image);
+                            }
+                        }
+                    });
+                    // skip-forward buttonクリック時Callback
+                    let ui_weak_for_skip = ui.as_weak();
+                    ui.on_skip_forward(move |index| {
+                        if let Some(image) = frames_model_for_skip.row_data(index as usize) {
+                            if let Some(ui) = ui_weak_for_skip.upgrade() {
                                 ui.set_gif_image(image);
                             }
                         }

@@ -11,14 +11,16 @@ export { MessageDialog } from "message-dialog.slint";
 
 export component AppWindow inherits Window {
     in property <image> gif-image;
-    in property <int> gif-frame-count;
+    in property <int> gif-frame-count: 0;
     in property <bool> is-loading: false;
     in-out property <int> current-tab: 0;
     in-out property <[image]> frames;
-    in-out property <int> selected-frame-index: -1;
+    in-out property <int> selected-frame-index: 0;
     callback pick-gif();
     callback show-test-dialog();
     callback frame-selected(int);
+    callback skip-back(int);
+    callback skip-forward(int);
 
     default-font-size: AppStyle.font-size;
     preferred-height: 560px;
@@ -73,6 +75,7 @@ export component AppWindow inherits Window {
             // Main Display
             VerticalLayout {
                 vertical-stretch: 1;
+                padding-bottom: 12px;
 
                 if !is-loading && gif-image.width == 0: Button {
                     text: "Pick GIF";
@@ -112,6 +115,9 @@ export component AppWindow inherits Window {
                                 icon: @image-url("assets/skip-back.svg");
                                 colorize-icon: true;
                                 clicked => {
+                                    let prev = selected-frame-index - 1;
+                                    root.selected-frame-index = prev < 0 ? frames.length - 1 : prev;
+                                    root.skip-back(selected-frame-index);
                                 }
                             }
                         }
@@ -133,6 +139,9 @@ export component AppWindow inherits Window {
                                 icon: @image-url("assets/skip-forward.svg");
                                 colorize-icon: true;
                                 clicked => {
+                                    let next = selected-frame-index + 1;
+                                    root.selected-frame-index = next >= frames.length ? 0 : next;
+                                    root.skip-forward(selected-frame-index);
                                 }
                             }
                         }
