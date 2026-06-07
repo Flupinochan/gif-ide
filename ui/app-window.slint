@@ -188,6 +188,20 @@ export component AppWindow inherits Window {
                 vertical-stretch: 0;
                 padding: 12px;
 
+                property <length> fling-velocity: 0px;
+
+                inertia-timer := Timer {
+                    interval: 16ms;
+                    triggered => {
+                        let max-scroll = frame-list.preferred-width - frame-scroll.visible-width;
+                        frame-scroll.viewport-x = clamp(frame-scroll.viewport-x + fling-velocity, -max-scroll, 0px);
+                        fling-velocity = fling-velocity * 0.92;
+                        if (abs(fling-velocity) < 0.5px) {
+                            self.running = false;
+                        }
+                    }
+                }
+
                 HorizontalLayout {
                     padding-bottom: 8px;
                     alignment: end;
@@ -198,7 +212,7 @@ export component AppWindow inherits Window {
                     }
                 }
 
-                ScrollView {
+                frame-scroll := ScrollView {
                     viewport-width: frame-list.preferred-width;
                     height: frame-list.preferred-height;
 
@@ -207,9 +221,37 @@ export component AppWindow inherits Window {
                         spacing: 8px;
                         padding-bottom: 22px;
                         for frame[i] in frames: TouchArea {
+                            property <bool> is-dragging: false;
+
+                            // 長押しスクロール動作
+                            mouse-cursor: self.pressed ? MouseCursor.grabbing : MouseCursor.grab;
+                            pointer-event(e) => {
+                                if (e.kind == PointerEventKind.down) {
+                                    is-dragging = false;
+                                    fling-velocity = 0px;
+                                    inertia-timer.running = false;
+                                }
+                                if (e.kind == PointerEventKind.up && is-dragging) {
+                                    if (abs(fling-velocity) > 1px) {
+                                        inertia-timer.running = true;
+                                    }
+                                }
+                            }
+                            moved => {
+                                let dx = self.mouse-x - self.pressed-x;
+                                if (abs(dx) > 4px || is-dragging) {
+                                    is-dragging = true;
+                                    let prev-x = frame-scroll.viewport-x;
+                                    let max-scroll = frame-list.preferred-width - frame-scroll.visible-width;
+                                    frame-scroll.viewport-x = clamp(frame-scroll.viewport-x + dx, -max-scroll, 0px);
+                                    fling-velocity = frame-scroll.viewport-x - prev-x;
+                                }
+                            }
                             clicked => {
-                                root.selected-frame-index = i;
-                                root.frame-selected(i);
+                                if (!is-dragging) {
+                                    root.selected-frame-index = i;
+                                    root.frame-selected(i);
+                                }
                             }
                             width: 64px;
                             height: 50px;
