@@ -1,4 +1,5 @@
 use anyhow::Result;
+use slint::{Image, Rgba8Pixel, SharedPixelBuffer};
 use std::fs::File;
 use std::path::Path;
 
@@ -21,6 +22,7 @@ pub struct GifFile {
 pub trait Gif {
     fn frame_count(&self) -> usize;
     fn frames(&self) -> &[GifFrame];
+    fn frame_image(&self, index: usize) -> Option<Image>;
 }
 
 impl GifFile {
@@ -57,5 +59,21 @@ impl Gif for GifFile {
 
     fn frames(&self) -> &[GifFrame] {
         &self.frames
+    }
+
+    fn frame_image(&self, index: usize) -> Option<Image> {
+        let frame = self.frames.get(index)?;
+        let w = self.canvas_width as u32;
+        let h = self.canvas_height as u32;
+        let mut buffer = SharedPixelBuffer::<Rgba8Pixel>::new(w, h);
+        let pixels = buffer.make_mut_bytes();
+        for row in 0..frame.height as u32 {
+            for col in 0..frame.width as u32 {
+                let src = ((row * frame.width as u32 + col) * 4) as usize;
+                let dst = (((frame.top as u32 + row) * w + frame.left as u32 + col) * 4) as usize;
+                pixels[dst..dst + 4].copy_from_slice(&frame.pixels[src..src + 4]);
+            }
+        }
+        Some(Image::from_rgba8(buffer))
     }
 }

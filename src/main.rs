@@ -5,8 +5,9 @@ mod gif_data;
 
 use anyhow::Result;
 use rfd::FileDialog;
-use slint::SharedString;
+use slint::{Model, ModelRc, SharedString, VecModel};
 use std::path::PathBuf;
+use std::rc::Rc;
 
 use crate::gif_data::{Gif, GifFile};
 
@@ -46,6 +47,15 @@ fn main() -> Result<()> {
 
     let ui = AppWindow::new()?;
     let ui_weak = ui.as_weak();
+
+    slint::invoke_from_event_loop(move || {
+        if let Some(ui) = ui_weak.upgrade() {
+            ui.window().set_maximized(true);
+        }
+    })
+    .unwrap();
+
+    let ui_weak = ui.as_weak();
     ui.on_pick_gif(move || {
         let Some(path_buf) = pick_gif_file() else {
             return;
@@ -61,6 +71,27 @@ fn main() -> Result<()> {
             match result {
                 Ok(gif_file) => {
                     ui.set_gif_frame_count(gif_file.frame_count() as i32);
+
+                    if let Some(image) = gif_file.frame_image(0) {
+                        ui.set_gif_image(image);
+                        ui.set_selected_frame_index(0);
+                    }
+
+                    let frame_images: Vec<slint::Image> = (0..gif_file.frame_count())
+                        .filter_map(|i| gif_file.frame_image(i))
+                        .collect();
+                    let frames_model = Rc::new(VecModel::from(frame_images));
+                    let frames_model_ref = frames_model.clone();
+                    ui.set_frames(ModelRc::from(frames_model));
+
+                    let ui_weak_for_frame = ui.as_weak();
+                    ui.on_frame_selected(move |index| {
+                        if let Some(image) = frames_model_ref.row_data(index as usize) {
+                            if let Some(ui) = ui_weak_for_frame.upgrade() {
+                                ui.set_gif_image(image);
+                            }
+                        }
+                    });
                 }
                 Err(e) => {
                     show_dialog(

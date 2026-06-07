@@ -2,38 +2,249 @@ import {
     Button,
     VerticalBox,
     Spinner,
+    Palette,
+    Slider,
+    ScrollView,
 } from "std-widgets.slint";
 import { AppStyle } from "global-styles.slint";
 export { MessageDialog } from "message-dialog.slint";
 
 export component AppWindow inherits Window {
-    default-font-size: AppStyle.font-size;
     in property <image> gif-image;
     in property <int> gif-frame-count;
     in property <bool> is-loading: false;
+    in-out property <int> current-tab: 0;
+    in-out property <[image]> frames;
+    in-out property <int> selected-frame-index: -1;
     callback pick-gif();
+    callback show-test-dialog();
+    callback frame-selected(int);
 
-    VerticalBox {
-        padding: 16px;
-        spacing: 12px;
+    default-font-size: AppStyle.font-size;
+    preferred-height: 560px;
+    preferred-width: 900px;
 
-        if !is-loading: Button {
-            text: "Pick GIF";
-            clicked => {
-                root.pick-gif();
+    VerticalLayout {
+        // GIF/Movie/Theme Button
+        HorizontalLayout {
+            alignment: end;
+            padding: 12px;
+            spacing: 20px;
+
+            for label[i] in ["GIF", "Movie"]: TouchArea {
+                clicked => {
+                    root.current-tab = i;
+                }
+
+                VerticalLayout {
+                    Text {
+                        height: 30px;
+                        vertical-alignment: center;
+                        text: label;
+                        color: root.current-tab == i ? Palette.foreground : Palette.foreground.transparentize(0.5);
+                    }
+
+                    Rectangle {
+                        height: 2px;
+                        border-radius: 1px;
+                        background: root.current-tab == i ? Palette.accent-background : transparent;
+                    }
+                }
+            }
+
+            VerticalLayout {
+                alignment: center;
+
+                Button {
+                    icon: Palette.color-scheme == ColorScheme.dark ? @image-url("assets/sun.svg") : @image-url("assets/moon.svg");
+                    colorize-icon: true;
+                    clicked => {
+                        if (Palette.color-scheme == ColorScheme.dark) {
+                            Palette.color-scheme = ColorScheme.light;
+                        } else {
+                            Palette.color-scheme = ColorScheme.dark;
+                        }
+                    }
+                }
             }
         }
 
-        if is-loading: Spinner {
-            indeterminate: true;
+        if current-tab == 0: VerticalLayout {
+            // Main Display
+            VerticalLayout {
+                vertical-stretch: 1;
+
+                if !is-loading && gif-image.width == 0: Button {
+                    text: "Pick GIF";
+                    clicked => root.pick-gif();
+                }
+
+                if is-loading: Spinner {
+                    indeterminate: true;
+                }
+
+                if gif-image.width > 0: Image {
+                    source: gif-image;
+                }
+            }
+
+            // Play Bar
+            VerticalLayout {
+                alignment: center;
+                vertical-stretch: 0;
+
+                Rectangle {
+                    height: 1px;
+                    background: Palette.foreground.transparentize(0.7);
+                }
+
+                HorizontalLayout {
+                    padding: 12px;
+                    spacing: 12px;
+
+                    HorizontalLayout {
+                        alignment: center;
+                        spacing: 12px;
+
+                        VerticalLayout {
+                            alignment: center;
+                            Button {
+                                icon: @image-url("assets/skip-back.svg");
+                                colorize-icon: true;
+                                clicked => {
+                                }
+                            }
+                        }
+
+                        VerticalLayout {
+                            alignment: center;
+                            Button {
+                                icon: @image-url("assets/play.svg");
+                                colorize-icon: true;
+                                primary: true;
+                                clicked => {
+                                }
+                            }
+                        }
+
+                        VerticalLayout {
+                            alignment: center;
+                            Button {
+                                icon: @image-url("assets/skip-forward.svg");
+                                colorize-icon: true;
+                                clicked => {
+                                }
+                            }
+                        }
+                    }
+
+                    Slider { }
+
+                    HorizontalLayout {
+                        alignment: center;
+                        spacing: 8px;
+
+                        VerticalLayout {
+                            alignment: center;
+                            Text {
+                                text: "00:00";
+                            }
+                        }
+
+                        VerticalLayout {
+                            alignment: center;
+                            Text {
+                                text: "/";
+                            }
+                        }
+
+                        VerticalLayout {
+                            alignment: center;
+                            Text {
+                                text: "00:00";
+                            }
+                        }
+                    }
+                }
+
+                Rectangle {
+                    height: 1px;
+                    background: Palette.foreground.transparentize(0.7);
+                }
+            }
+
+            // Frame Bar
+            VerticalLayout {
+                alignment: center;
+                vertical-stretch: 0;
+                padding: 12px;
+
+                HorizontalLayout {
+                    padding-bottom: 8px;
+                    alignment: end;
+                    Text {
+                        font-size: 12px;
+                        color: Palette.foreground.transparentize(0.4);
+                        text: gif-frame-count + " frames";
+                    }
+                }
+
+                ScrollView {
+                    viewport-width: frame-list.preferred-width;
+                    height: frame-list.preferred-height;
+
+                    frame-list := HorizontalLayout {
+                        alignment: start;
+                        spacing: 8px;
+                        padding-bottom: 22px;
+                        for frame[i] in frames: TouchArea {
+                            clicked => {
+                                root.selected-frame-index = i;
+                                root.frame-selected(i);
+                            }
+                            width: 64px;
+                            height: 50px;
+
+                            Rectangle {
+                                border-width: 1px;
+                                border-color: root.selected-frame-index == i ? Palette.accent-background : parent.has-hover ? Palette.accent-background.transparentize(0.5) : Palette.foreground.transparentize(0.7);
+                                border-radius: 4px;
+                                clip: true;
+
+                                Image {
+                                    width: parent.width;
+                                    height: parent.height;
+                                    source: frame;
+                                    image-fit: cover;
+                                }
+
+                                Rectangle {
+                                    x: 4px;
+                                    y: parent.height - self.height - 4px;
+                                    width: num.preferred-width + 6px;
+                                    height: num.preferred-height + 2px;
+                                    border-radius: 2px;
+                                    background: Palette.background.transparentize(0.3);
+
+                                    num := Text {
+                                        x: 3px;
+                                        font-size: 10px;
+                                        color: Palette.foreground;
+                                        text: i + 1;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
 
-        if gif-frame-count > 0: Text {
-            text: "フレーム数: " + gif-frame-count;
-        }
-
-        if gif-image.width > 0: Image {
-            source: gif-image;
+        if current-tab == 1: VerticalLayout {
+            Text {
+                text: "動画 表示 (未実装)";
+                color: Palette.foreground.transparentize(0.5);
+            }
         }
     }
 }
