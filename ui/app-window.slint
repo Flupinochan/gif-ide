@@ -14,13 +14,16 @@ export component AppWindow inherits Window {
     in property <int> gif-frame-count: frames.length;
     in property <bool> is-loading: false;
     in-out property <int> current-tab: 0;
+    in property <string> total_duration: "00:00";
     in-out property <[image]> frames: [];
     in-out property <int> selected-frame-index: 0;
+    in-out property <bool> is-play;
     callback pick-gif();
     callback show-test-dialog();
     callback frame-selected(int);
     callback skip-back(int);
     callback skip-forward(int);
+    callback play(int);
 
     default-font-size: AppStyle.font-size;
     preferred-height: 560px;
@@ -125,10 +128,12 @@ export component AppWindow inherits Window {
                         VerticalLayout {
                             alignment: center;
                             Button {
-                                icon: @image-url("assets/play.svg");
+                                icon: is-play ? @image-url("assets/stop.svg") : @image-url("assets/play.svg");
                                 colorize-icon: true;
                                 primary: true;
                                 clicked => {
+                                    is-play = !is-play;
+                                    root.play(selected-frame-index);
                                 }
                             }
                         }
@@ -170,7 +175,7 @@ export component AppWindow inherits Window {
                         VerticalLayout {
                             alignment: center;
                             Text {
-                                text: "00:00";
+                                text: total_duration;
                             }
                         }
                     }
@@ -223,7 +228,7 @@ export component AppWindow inherits Window {
                         for frame[i] in frames: TouchArea {
                             property <bool> is-dragging: false;
 
-                            // 長押しスクロール動作
+                            // フリックスクロール動作
                             mouse-cursor: self.pressed ? MouseCursor.grabbing : MouseCursor.grab;
                             pointer-event(e) => {
                                 if (e.kind == PointerEventKind.down) {

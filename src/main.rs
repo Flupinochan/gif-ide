@@ -5,7 +5,7 @@ mod gif_data;
 
 use anyhow::Result;
 use rfd::FileDialog;
-use slint::{Model, ModelRc, SharedString, VecModel};
+use slint::{Model, ModelRc, SharedString, Timer, VecModel};
 use std::path::PathBuf;
 use std::rc::Rc;
 
@@ -39,6 +39,27 @@ fn pick_gif_file() -> Option<PathBuf> {
         .set_directory("/")
         .set_title("GIFを選択してください")
         .pick_file()
+}
+
+// 再帰処理で再生機能を実装
+fn schedule_next_frame(
+    ui_weak: slint::Weak<AppWindow>,
+    frames: Rc<Vec<slint::Image>>,
+    delays: Rc<Vec<u32>>,
+    frame_idx: usize,
+) {
+    let delay_ms = delays[frame_idx] as u64 * 10;
+    Timer::single_shot(std::time::Duration::from_millis(delay_ms), move || {
+        let Some(ui) = ui_weak.upgrade() else { return };
+        // stopの場合は再帰処理をしないため停止する
+        if !ui.get_is_play() {
+            return;
+        }
+        let next = (frame_idx + 1) % frames.len();
+        ui.set_gif_image(frames[next].clone());
+        ui.set_selected_frame_index(next as i32);
+        schedule_next_frame(ui_weak, frames, delays, next);
+    });
 }
 
 fn main() -> Result<()> {
@@ -79,10 +100,29 @@ fn main() -> Result<()> {
                         ui.set_selected_frame_index(0);
                     }
 
-                    let frame_images: Vec<slint::Image> = (0..gif_file.frames().len())
-                        .filter_map(|i| gif_file.frame_image(i))
-                        .collect();
-                    let frames_model = Rc::new(VecModel::from(frame_images));
+                    // 再生時間更新
+                    let total_duration_cs: u32 = gif_file
+                        .frames()
+                        .iter()
+                        .map(|frame| frame.delay as u32)
+                        .sum();
+                    let total_seconds = total_duration_cs / 100;
+                    let formatted = format!("{:02}:{:02}", total_seconds / 60, total_seconds % 60);
+                    ui.set_total_duration(SharedString::from(formatted));
+
+                    let frames_rc = Rc::new(
+                        (0..gif_file.frames().len())
+                            .filter_map(|i| gif_file.frame_image(i))
+                            .collect::<Vec<slint::Image>>(),
+                    );
+                    let delays_rc = Rc::new(
+                        gif_file
+                            .frames()
+                            .iter()
+                            .map(|f| (f.delay as u32).max(2))
+                            .collect::<Vec<u32>>(),
+                    );
+                    let frames_model = Rc::new(VecModel::from((*frames_rc).clone()));
                     let frames_model_ref = frames_model.clone();
                     let frames_model_for_skip = frames_model_ref.clone();
                     let frames_model_for_back = frames_model_for_skip.clone();
@@ -114,6 +154,23 @@ fn main() -> Result<()> {
                             if let Some(ui) = ui_weak_for_skip.upgrade() {
                                 ui.set_gif_image(image);
                             }
+                        }
+                    });
+                    // 再生Callback
+                    let ui_weak_for_play = ui.as_weak();
+                    let frames_for_play = frames_rc.clone();
+                    let delays_for_play = delays_rc.clone();
+                    ui.on_play(move |start_index| {
+                        let Some(ui) = ui_weak_for_play.upgrade() else {
+                            return;
+                        };
+                        if ui.get_is_play() {
+                            schedule_next_frame(
+                                ui.as_weak(),
+                                frames_for_play.clone(),
+                                delays_for_play.clone(),
+                                start_index as usize,
+                            );
                         }
                     });
                 }
