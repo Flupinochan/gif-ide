@@ -1,12 +1,9 @@
 import { ScrollView, StandardButton } from "std-widgets.slint";
-import { AppStyle } from "global-styles.slint";
-
 export component MessageDialog inherits Dialog {
     in property <string> title-text;
     in property <string> message;
     callback ok-clicked();
 
-    default-font-size: AppStyle.font-size;
     always-on-top: true;
     preferred-width: 500px;
     padding: 16px;

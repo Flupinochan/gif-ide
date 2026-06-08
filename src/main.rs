@@ -6,6 +6,7 @@ mod gif_data;
 use anyhow::Result;
 use rfd::FileDialog;
 use slint::{Model, ModelRc, SharedString, Timer, VecModel};
+use std::cell::RefCell;
 use std::path::PathBuf;
 use std::rc::Rc;
 
@@ -41,6 +42,13 @@ fn pick_gif_file() -> Option<PathBuf> {
         .pick_file()
 }
 
+fn save_gif_file() -> Option<PathBuf> {
+    FileDialog::new()
+        .add_filter("GIF", &["gif"])
+        .set_title("保存先を選択してください")
+        .save_file()
+}
+
 // 再帰処理で再生機能を実装
 fn schedule_next_frame(ui_weak: slint::Weak<AppWindow>, frame_idx: usize) {
     let Some(ui) = ui_weak.upgrade() else { return };
@@ -68,6 +76,8 @@ fn main() -> Result<()> {
 
     let ui = AppWindow::new()?;
 
+    let gif_file_ref: Rc<RefCell<Option<GifFile>>> = Rc::new(RefCell::new(None));
+
     // 画面最大化
     let ui_weak = ui.as_weak();
     slint::invoke_from_event_loop(move || {
@@ -79,13 +89,19 @@ fn main() -> Result<()> {
 
     // GIFファイル選択Callback
     let ui_weak = ui.as_weak();
+    let gif_ref_open = gif_file_ref.clone();
     ui.on_pick_gif(move || {
         let Some(path_buf) = pick_gif_file() else {
             return;
         };
+        let filename = path_buf
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_default();
 
         let Some(ui) = ui_weak.upgrade() else { return };
         ui.set_is_loading(true);
+        let gif_ref = gif_ref_open.clone();
         slint::spawn_local(async move {
             let result = tokio::task::spawn_blocking(move || GifFile::new(&path_buf))
                 .await
@@ -93,6 +109,7 @@ fn main() -> Result<()> {
             ui.set_is_loading(false);
             match result {
                 Ok(gif_file) => {
+                    *gif_ref.borrow_mut() = Some(gif_file.clone());
                     // 再生時間更新
                     let total_duration_cs: u32 = gif_file
                         .frames()
@@ -119,6 +136,9 @@ fn main() -> Result<()> {
                     // フレームタイムライン更新
                     ui.set_frames(ModelRc::from(frames_model));
                     ui.set_selected_frame_index(0);
+                    ui.set_current_filename(SharedString::from(filename));
+                    ui.set_canvas_width(gif_file.canvas_width as i32);
+                    ui.set_canvas_height(gif_file.canvas_height as i32);
 
                     // 再生Callback
                     let ui_weak_for_play = ui.as_weak();
@@ -138,6 +158,29 @@ fn main() -> Result<()> {
                         &ui,
                     );
                 }
+            }
+        })
+        .unwrap();
+    });
+
+    // GIF出力Callback
+    let ui_weak_export = ui.as_weak();
+    let gif_ref_export = gif_file_ref.clone();
+    ui.on_export_gif(move || {
+        let Some(path) = save_gif_file() else { return };
+        let gif_clone = gif_ref_export.borrow().clone();
+        let Some(gif) = gif_clone else { return };
+        let ui_weak = ui_weak_export.clone();
+        slint::spawn_local(async move {
+            let result = tokio::task::spawn_blocking(move || gif.export(&path))
+                .await
+                .unwrap();
+            if let Err(e) = result {
+                let _ = slint::invoke_from_event_loop(move || {
+                    if let Some(ui) = ui_weak.upgrade() {
+                        show_dialog("エラー", &format!("GIFの出力に失敗しました: {}", e), &ui);
+                    }
+                });
             }
         })
         .unwrap();

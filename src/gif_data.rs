@@ -1,8 +1,10 @@
 use anyhow::Result;
 use slint::{Image, Rgba8Pixel, SharedPixelBuffer};
 use std::fs::File;
+use std::io::BufWriter;
 use std::path::Path;
 
+#[derive(Clone)]
 pub struct GifFrame {
     pub pixels: Vec<u8>,
     pub width: u16,
@@ -13,6 +15,7 @@ pub struct GifFrame {
     pub dispose: gif::DisposalMethod,
 }
 
+#[derive(Clone)]
 pub struct GifFile {
     frames: Vec<GifFrame>,
     pub canvas_width: u16,
@@ -48,6 +51,68 @@ impl GifFile {
             gif_file.frames.push(gif_frame);
         }
         Ok(gif_file)
+    }
+
+    // UIでカスタム設定として実装予定の箇所をTODOとして記載
+    pub fn export(&self, path: &Path) -> Result<()> {
+        let w = self.canvas_width;
+        let h = self.canvas_height;
+        let file = BufWriter::new(File::create(path)?);
+        let mut encoder = gif::Encoder::new(file, w, h, &[])?;
+        // TODO: 無限ループ
+        encoder.set_repeat(gif::Repeat::Infinite)?;
+
+        // TODO: Canvasサイズ
+        let mut canvas = vec![0u8; w as usize * h as usize * 4];
+
+        for frame in &self.frames {
+            let prev_canvas = if frame.dispose == gif::DisposalMethod::Previous {
+                Some(canvas.clone())
+            } else {
+                None
+            };
+
+            // Frame作成
+            for row in 0..frame.height as usize {
+                for col in 0..frame.width as usize {
+                    let src = (row * frame.width as usize + col) * 4;
+                    let dst =
+                        ((frame.top as usize + row) * w as usize + frame.left as usize + col) * 4;
+                    if frame.pixels[src + 3] > 0 {
+                        canvas[dst..dst + 4].copy_from_slice(&frame.pixels[src..src + 4]);
+                    }
+                }
+            }
+
+            let mut pixels = canvas.clone();
+            let mut gif_frame = gif::Frame::from_rgba_speed(w, h, &mut pixels, 10);
+            gif_frame.delay = frame.delay;
+            gif_frame.dispose = gif::DisposalMethod::Background;
+            encoder.write_frame(&gif_frame)?;
+
+            // 後処理
+            match frame.dispose {
+                // canvasを0でfillして透明化
+                gif::DisposalMethod::Background => {
+                    for row in 0..frame.height as usize {
+                        for col in 0..frame.width as usize {
+                            let dst = ((frame.top as usize + row) * w as usize
+                                + frame.left as usize
+                                + col)
+                                * 4;
+                            canvas[dst..dst + 4].fill(0);
+                        }
+                    }
+                }
+                // 前フレームの状態に戻す
+                gif::DisposalMethod::Previous => {
+                    canvas = prev_canvas.unwrap();
+                }
+                // TODO: Keepの場合は前フレームと後フレームを差分比較して最小サイズに
+                _ => {}
+            }
+        }
+        Ok(())
     }
 }
 

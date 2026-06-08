@@ -6,7 +6,6 @@ import {
     Slider,
     ScrollView,
 } from "std-widgets.slint";
-import { AppStyle } from "global-styles.slint";
 export { MessageDialog } from "message-dialog.slint";
 
 struct FrameData {
@@ -22,42 +21,34 @@ export component AppWindow inherits Window {
     in-out property <[FrameData]> frames: [];
     in-out property <int> selected-frame-index: 0;
     in-out property <bool> is-play;
+    in-out property <length> sidebar-width: 200px;
+    in property <string> current-filename: "";
+    in property <int> canvas-width: 0;
+    in property <int> canvas-height: 0;
     callback pick-gif();
     callback show-test-dialog();
     callback play(int);
+    callback export-gif();
 
-    default-font-size: AppStyle.font-size;
     preferred-height: 560px;
     preferred-width: 900px;
 
     VerticalLayout {
-        // GIF/Movie/Theme Button
+        // Header
         HorizontalLayout {
-            alignment: end;
+            alignment: space-between;
             padding: 12px;
             spacing: 20px;
 
-            for label[i] in ["GIF", "Movie"]: TouchArea {
-                clicked => {
-                    root.current-tab = i;
-                }
-
-                VerticalLayout {
-                    Text {
-                        height: 30px;
-                        vertical-alignment: center;
-                        text: label;
-                        color: root.current-tab == i ? Palette.foreground : Palette.foreground.transparentize(0.5);
-                    }
-
-                    Rectangle {
-                        height: 2px;
-                        border-radius: 1px;
-                        background: root.current-tab == i ? Palette.accent-background : transparent;
-                    }
+            VerticalLayout {
+                alignment: center;
+                Text {
+                    text: "GIF IDE";
+                    font-size: 16px;
                 }
             }
 
+            // Theme Button
             VerticalLayout {
                 alignment: center;
 
@@ -75,229 +66,405 @@ export component AppWindow inherits Window {
             }
         }
 
-        if current-tab == 0: VerticalLayout {
-            // Main Display
-            VerticalLayout {
-                vertical-stretch: 1;
-                padding-bottom: 12px;
-
-                if !is-loading && frames.length == 0: Button {
-                    text: "Pick GIF";
-                    clicked => root.pick-gif();
-                }
-
-                if is-loading: Spinner {
-                    indeterminate: true;
-                }
-
-                if frames.length > 0: Image {
-                    source: frames[selected-frame-index].image;
-                }
-            }
-
-            // Play Bar
-            VerticalLayout {
-                alignment: center;
-                vertical-stretch: 0;
-
-                Rectangle {
-                    height: 1px;
-                    background: Palette.foreground.transparentize(0.7);
-                }
-
-                HorizontalLayout {
-                    padding: 12px;
-                    spacing: 12px;
-
-                    HorizontalLayout {
-                        alignment: center;
-                        spacing: 12px;
-
-                        VerticalLayout {
-                            alignment: center;
-                            Button {
-                                icon: @image-url("assets/skip-back.svg");
-                                colorize-icon: true;
-                                clicked => {
-                                    let prev = selected-frame-index - 1;
-                                    root.selected-frame-index = prev < 0 ? frames.length - 1 : prev;
-                                }
-                            }
-                        }
-
-                        VerticalLayout {
-                            alignment: center;
-                            Button {
-                                icon: is-play ? @image-url("assets/stop.svg") : @image-url("assets/play.svg");
-                                colorize-icon: true;
-                                primary: true;
-                                clicked => {
-                                    is-play = !is-play;
-                                    root.play(selected-frame-index);
-                                }
-                            }
-                        }
-
-                        VerticalLayout {
-                            alignment: center;
-                            Button {
-                                icon: @image-url("assets/skip-forward.svg");
-                                colorize-icon: true;
-                                clicked => {
-                                    let next = selected-frame-index + 1;
-                                    root.selected-frame-index = next >= frames.length ? 0 : next;
-                                }
-                            }
-                        }
-                    }
-
-                    Slider { }
-
-                    HorizontalLayout {
-                        alignment: center;
-                        spacing: 8px;
-
-                        VerticalLayout {
-                            alignment: center;
-                            Text {
-                                text: "00:00";
-                            }
-                        }
-
-                        VerticalLayout {
-                            alignment: center;
-                            Text {
-                                text: "/";
-                            }
-                        }
-
-                        VerticalLayout {
-                            alignment: center;
-                            Text {
-                                text: total_duration;
-                            }
-                        }
-                    }
-                }
-
-                Rectangle {
-                    height: 1px;
-                    background: Palette.foreground.transparentize(0.7);
-                }
-            }
-
-            // Frame Bar
-            VerticalLayout {
-                alignment: center;
-                vertical-stretch: 0;
-                padding: 12px;
-
-                property <length> fling-velocity: 0px;
-
-                inertia-timer := Timer {
-                    interval: 16ms;
-                    triggered => {
-                        let max-scroll = frame-list.preferred-width - frame-scroll.visible-width;
-                        frame-scroll.viewport-x = clamp(frame-scroll.viewport-x + fling-velocity, -max-scroll, 0px);
-                        fling-velocity = fling-velocity * 0.92;
-                        if (abs(fling-velocity) < 0.5px) {
-                            self.running = false;
-                        }
-                    }
-                }
-
-                HorizontalLayout {
-                    padding-bottom: 8px;
-                    alignment: end;
-                    Text {
-                        font-size: 12px;
-                        color: Palette.foreground.transparentize(0.4);
-                        text: gif-frame-count + " frames";
-                    }
-                }
-
-                frame-scroll := ScrollView {
-                    viewport-width: frame-list.preferred-width;
-                    height: frame-list.preferred-height;
-
-                    frame-list := HorizontalLayout {
-                        alignment: start;
-                        spacing: 8px;
-                        padding-bottom: 22px;
-                        for frame[i] in frames: TouchArea {
-                            property <bool> is-dragging: false;
-
-                            // フリックスクロール動作
-                            mouse-cursor: self.pressed ? MouseCursor.grabbing : MouseCursor.grab;
-                            pointer-event(e) => {
-                                if (e.kind == PointerEventKind.down) {
-                                    is-dragging = false;
-                                    fling-velocity = 0px;
-                                    inertia-timer.running = false;
-                                }
-                                if (e.kind == PointerEventKind.up && is-dragging) {
-                                    if (abs(fling-velocity) > 1px) {
-                                        inertia-timer.running = true;
-                                    }
-                                }
-                            }
-                            moved => {
-                                let dx = self.mouse-x - self.pressed-x;
-                                if (abs(dx) > 4px || is-dragging) {
-                                    is-dragging = true;
-                                    let prev-x = frame-scroll.viewport-x;
-                                    let max-scroll = frame-list.preferred-width - frame-scroll.visible-width;
-                                    frame-scroll.viewport-x = clamp(frame-scroll.viewport-x + dx, -max-scroll, 0px);
-                                    fling-velocity = frame-scroll.viewport-x - prev-x;
-                                }
-                            }
-                            clicked => {
-                                if (!is-dragging) {
-                                    root.selected-frame-index = i;
-                                }
-                            }
-                            width: 64px;
-                            height: 50px;
-
-                            Rectangle {
-                                border-width: 1px;
-                                border-color: root.selected-frame-index == i ? Palette.accent-background : parent.has-hover ? Palette.accent-background.transparentize(0.5) : Palette.foreground.transparentize(0.7);
-                                border-radius: 4px;
-                                clip: true;
-
-                                Image {
-                                    width: parent.width;
-                                    height: parent.height;
-                                    source: frame.image;
-                                    image-fit: cover;
-                                }
-
-                                Rectangle {
-                                    x: 4px;
-                                    y: parent.height - self.height - 4px;
-                                    width: num.preferred-width + 6px;
-                                    height: num.preferred-height + 2px;
-                                    border-radius: 2px;
-                                    background: Palette.background.transparentize(0.3);
-
-                                    num := Text {
-                                        x: 3px;
-                                        font-size: 10px;
-                                        color: Palette.foreground;
-                                        text: i + 1;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
+        Rectangle {
+            height: 1px;
+            background: Palette.foreground.transparentize(0.7);
         }
 
-        if current-tab == 1: VerticalLayout {
-            Text {
-                text: "動画 表示 (未実装)";
-                color: Palette.foreground.transparentize(0.5);
+        HorizontalLayout {
+            // Main Display
+            VerticalLayout {
+                // Image Display
+                VerticalLayout {
+                    vertical-stretch: 1;
+                    padding-bottom: 12px;
+
+                    if !is-loading && frames.length == 0: Button {
+                        text: "Pick GIF";
+                        clicked => root.pick-gif();
+                    }
+
+                    if is-loading: Spinner {
+                        indeterminate: true;
+                    }
+
+                    if frames.length > 0: Image {
+                        source: frames[selected-frame-index].image;
+                    }
+                }
+
+                // Play Bar
+                VerticalLayout {
+                    alignment: center;
+                    vertical-stretch: 0;
+
+                    Rectangle {
+                        height: 1px;
+                        background: Palette.foreground.transparentize(0.7);
+                    }
+
+                    HorizontalLayout {
+                        padding: 12px;
+                        spacing: 12px;
+
+                        HorizontalLayout {
+                            alignment: center;
+                            spacing: 12px;
+
+                            VerticalLayout {
+                                alignment: center;
+                                Button {
+                                    icon: @image-url("assets/skip-back.svg");
+                                    colorize-icon: true;
+                                    clicked => {
+                                        let prev = selected-frame-index - 1;
+                                        root.selected-frame-index = prev < 0 ? frames.length - 1 : prev;
+                                    }
+                                }
+                            }
+
+                            VerticalLayout {
+                                alignment: center;
+                                Button {
+                                    icon: is-play ? @image-url("assets/stop.svg") : @image-url("assets/play.svg");
+                                    colorize-icon: true;
+                                    primary: true;
+                                    clicked => {
+                                        is-play = !is-play;
+                                        root.play(selected-frame-index);
+                                    }
+                                }
+                            }
+
+                            VerticalLayout {
+                                alignment: center;
+                                Button {
+                                    icon: @image-url("assets/skip-forward.svg");
+                                    colorize-icon: true;
+                                    clicked => {
+                                        let next = selected-frame-index + 1;
+                                        root.selected-frame-index = next >= frames.length ? 0 : next;
+                                    }
+                                }
+                            }
+                        }
+
+                        Slider { }
+
+                        HorizontalLayout {
+                            alignment: center;
+                            spacing: 8px;
+
+                            VerticalLayout {
+                                alignment: center;
+                                Text {
+                                    text: "00:00";
+                                    font-size: 14px;
+                                }
+                            }
+
+                            VerticalLayout {
+                                alignment: center;
+                                Text {
+                                    text: "/";
+                                    font-size: 14px;
+                                }
+                            }
+
+                            VerticalLayout {
+                                alignment: center;
+                                Text {
+                                    text: total_duration;
+                                    font-size: 14px;
+                                }
+                            }
+                        }
+                    }
+
+                    Rectangle {
+                        height: 1px;
+                        background: Palette.foreground.transparentize(0.7);
+                    }
+                }
+
+                // Frame Bar
+                VerticalLayout {
+                    alignment: center;
+                    vertical-stretch: 0;
+                    padding: 12px;
+
+                    property <length> fling-velocity: 0px;
+
+                    inertia-timer := Timer {
+                        interval: 16ms;
+                        triggered => {
+                            let max-scroll = frame-list.preferred-width - frame-scroll.visible-width;
+                            frame-scroll.viewport-x = clamp(frame-scroll.viewport-x + fling-velocity, -max-scroll, 0px);
+                            fling-velocity = fling-velocity * 0.92;
+                            if (abs(fling-velocity) < 0.5px) {
+                                self.running = false;
+                            }
+                        }
+                    }
+
+                    HorizontalLayout {
+                        padding-bottom: 8px;
+                        alignment: end;
+                        Text {
+                            font-size: 12px;
+                            color: Palette.foreground.transparentize(0.4);
+                            text: gif-frame-count + " frames";
+                        }
+                    }
+
+                    frame-scroll := ScrollView {
+                        viewport-width: frame-list.preferred-width;
+                        height: frame-list.preferred-height;
+
+                        frame-list := HorizontalLayout {
+                            alignment: start;
+                            spacing: 8px;
+                            padding-bottom: 22px;
+                            for frame[i] in frames: TouchArea {
+                                property <bool> is-dragging: false;
+
+                                // フリックスクロール動作
+                                mouse-cursor: self.pressed ? MouseCursor.grabbing : MouseCursor.grab;
+                                pointer-event(e) => {
+                                    if (e.kind == PointerEventKind.down) {
+                                        is-dragging = false;
+                                        fling-velocity = 0px;
+                                        inertia-timer.running = false;
+                                    }
+                                    if (e.kind == PointerEventKind.up && is-dragging) {
+                                        if (abs(fling-velocity) > 1px) {
+                                            inertia-timer.running = true;
+                                        }
+                                    }
+                                }
+                                moved => {
+                                    let dx = self.mouse-x - self.pressed-x;
+                                    if (abs(dx) > 4px || is-dragging) {
+                                        is-dragging = true;
+                                        let prev-x = frame-scroll.viewport-x;
+                                        let max-scroll = frame-list.preferred-width - frame-scroll.visible-width;
+                                        frame-scroll.viewport-x = clamp(frame-scroll.viewport-x + dx, -max-scroll, 0px);
+                                        fling-velocity = frame-scroll.viewport-x - prev-x;
+                                    }
+                                }
+                                clicked => {
+                                    if (!is-dragging) {
+                                        root.selected-frame-index = i;
+                                    }
+                                }
+                                width: 64px;
+                                height: 50px;
+
+                                Rectangle {
+                                    border-width: 1px;
+                                    border-color: root.selected-frame-index == i ? Palette.accent-background : parent.has-hover ? Palette.accent-background.transparentize(0.5) : Palette.foreground.transparentize(0.7);
+                                    border-radius: 4px;
+                                    clip: true;
+
+                                    Image {
+                                        width: parent.width;
+                                        height: parent.height;
+                                        source: frame.image;
+                                        image-fit: cover;
+                                    }
+
+                                    Rectangle {
+                                        x: 4px;
+                                        y: parent.height - self.height - 4px;
+                                        width: num.preferred-width + 6px;
+                                        height: num.preferred-height + 2px;
+                                        border-radius: 2px;
+                                        background: Palette.background.transparentize(0.3);
+
+                                        num := Text {
+                                            x: 3px;
+                                            font-size: 10px;
+                                            color: Palette.foreground;
+                                            text: i + 1;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Divider
+            Rectangle {
+                width: 5px;
+
+                Rectangle {
+                    width: 1px;
+                    height: 100%;
+                    x: (parent.width - self.width) / 2;
+                    background: Palette.foreground.transparentize(0.7);
+                }
+
+                TouchArea {
+                    mouse-cursor: col-resize;
+                    property <length> start-abs-x: 0px;
+                    property <length> start-sidebar-width: 0px;
+
+                    pointer-event(e) => {
+                        if (e.kind == PointerEventKind.down) {
+                            start-abs-x = self.absolute-position.x + self.mouse-x;
+                            start-sidebar-width = root.sidebar-width;
+                        }
+                    }
+
+                    moved => {
+                        root.sidebar-width = max(60px, min(500px,
+                            start-sidebar-width - (self.absolute-position.x + self.mouse-x - start-abs-x)));
+                    }
+                }
+            }
+
+            // Side Bar
+            VerticalLayout {
+                width: root.sidebar-width;
+
+                // 設定/その他
+                HorizontalLayout {
+                    alignment: start;
+                    padding-top: 12px;
+                    padding-right: 12px;
+                    padding-left: 12px;
+                    padding-bottom: 4px;
+                    spacing: 20px;
+
+                    for label[i] in ["設定", "その他"]: TouchArea {
+                        clicked => {
+                            root.current-tab = i;
+                        }
+
+                        VerticalLayout {
+                            spacing: 8px;
+                            Text {
+                                height: 20px;
+                                vertical-alignment: center;
+                                text: label;
+                                font-size: 14px;
+                                color: root.current-tab == i ? Palette.foreground : Palette.foreground.transparentize(0.5);
+                            }
+
+                            Rectangle {
+                                height: 2px;
+                                border-radius: 1px;
+                                background: root.current-tab == i ? Palette.accent-background : transparent;
+                            }
+                        }
+                    }
+                    Rectangle { }
+                }
+
+                Rectangle {
+                    height: 1px;
+                    background: Palette.foreground.transparentize(0.7);
+                }
+
+                if current-tab == 0: VerticalLayout {
+                    alignment: start;
+
+                    // File Info
+                    VerticalLayout {
+                        padding: 12px;
+                        spacing: 4px;
+                        alignment: center;
+
+                        // ファイル名
+                        HorizontalLayout {
+                            alignment: space-between;
+
+                            Text {
+                                text: "ファイル名";
+                                font-size: 12px;
+                                color: Palette.foreground.transparentize(0.5);
+                                vertical-alignment: center;
+                            }
+
+                            Text {
+                                text: current-filename == "" ? "---" : current-filename;
+                                font-size: 12px;
+                                color: Palette.foreground.transparentize(0.5);
+                                vertical-alignment: center;
+                            }
+                        }
+
+                        // 総フレーム数
+                        HorizontalLayout {
+                            alignment: space-between;
+
+                            Text {
+                                text: "総フレーム数";
+                                font-size: 12px;
+                                color: Palette.foreground.transparentize(0.5);
+                                vertical-alignment: center;
+                            }
+
+                            Text {
+                                text: gif-frame-count == 0 ? "---" : gif-frame-count;
+                                font-size: 12px;
+                                color: Palette.foreground.transparentize(0.5);
+                                vertical-alignment: center;
+                            }
+                        }
+
+                        // GIF Canvasサイズ
+                        HorizontalLayout {
+                            alignment: space-between;
+
+                            Text {
+                                text: "サイズ";
+                                font-size: 12px;
+                                color: Palette.foreground.transparentize(0.5);
+                                vertical-alignment: center;
+                            }
+
+                            Text {
+                                text: canvas-width == 0 ? "---" : canvas-width + " x " + canvas-height;
+                                font-size: 12px;
+                                color: Palette.foreground.transparentize(0.5);
+                                vertical-alignment: center;
+                            }
+                        }
+                    }
+
+                    Rectangle {
+                        height: 1px;
+                        background: Palette.foreground.transparentize(0.7);
+                    }
+
+                    // Export
+                    VerticalLayout {
+                        padding: 12px;
+                        spacing: 4px;
+                        alignment: center;
+
+                        Button {
+                            text: "GIF出力";
+                            primary: true;
+                            clicked => { root.export-gif(); }
+                        }
+                    }
+
+                    Rectangle {
+                        height: 1px;
+                        background: Palette.foreground.transparentize(0.7);
+                    }
+                }
+
+                if current-tab == 1: VerticalLayout {
+                    Text {
+                        text: "...";
+                        color: Palette.foreground.transparentize(0.5);
+                    }
+                }
             }
         }
     }
