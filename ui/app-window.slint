@@ -9,20 +9,21 @@ import {
 import { AppStyle } from "global-styles.slint";
 export { MessageDialog } from "message-dialog.slint";
 
+struct FrameData {
+    image: image,
+    delay: int,
+}
+
 export component AppWindow inherits Window {
-    in property <image> gif-image;
     in property <int> gif-frame-count: frames.length;
     in property <bool> is-loading: false;
     in-out property <int> current-tab: 0;
     in property <string> total_duration: "00:00";
-    in-out property <[image]> frames: [];
+    in-out property <[FrameData]> frames: [];
     in-out property <int> selected-frame-index: 0;
     in-out property <bool> is-play;
     callback pick-gif();
     callback show-test-dialog();
-    callback frame-selected(int);
-    callback skip-back(int);
-    callback skip-forward(int);
     callback play(int);
 
     default-font-size: AppStyle.font-size;
@@ -80,7 +81,7 @@ export component AppWindow inherits Window {
                 vertical-stretch: 1;
                 padding-bottom: 12px;
 
-                if !is-loading && gif-image.width == 0: Button {
+                if !is-loading && frames.length == 0: Button {
                     text: "Pick GIF";
                     clicked => root.pick-gif();
                 }
@@ -89,8 +90,8 @@ export component AppWindow inherits Window {
                     indeterminate: true;
                 }
 
-                if gif-image.width > 0: Image {
-                    source: gif-image;
+                if frames.length > 0: Image {
+                    source: frames[selected-frame-index].image;
                 }
             }
 
@@ -120,7 +121,6 @@ export component AppWindow inherits Window {
                                 clicked => {
                                     let prev = selected-frame-index - 1;
                                     root.selected-frame-index = prev < 0 ? frames.length - 1 : prev;
-                                    root.skip-back(selected-frame-index);
                                 }
                             }
                         }
@@ -146,7 +146,6 @@ export component AppWindow inherits Window {
                                 clicked => {
                                     let next = selected-frame-index + 1;
                                     root.selected-frame-index = next >= frames.length ? 0 : next;
-                                    root.skip-forward(selected-frame-index);
                                 }
                             }
                         }
@@ -255,7 +254,6 @@ export component AppWindow inherits Window {
                             clicked => {
                                 if (!is-dragging) {
                                     root.selected-frame-index = i;
-                                    root.frame-selected(i);
                                 }
                             }
                             width: 64px;
@@ -270,7 +268,7 @@ export component AppWindow inherits Window {
                                 Image {
                                     width: parent.width;
                                     height: parent.height;
-                                    source: frame;
+                                    source: frame.image;
                                     image-fit: cover;
                                 }
 

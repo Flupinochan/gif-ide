@@ -42,23 +42,23 @@ fn pick_gif_file() -> Option<PathBuf> {
 }
 
 // 再帰処理で再生機能を実装
-fn schedule_next_frame(
-    ui_weak: slint::Weak<AppWindow>,
-    frames: Rc<Vec<slint::Image>>,
-    delays: Rc<Vec<u32>>,
-    frame_idx: usize,
-) {
-    let delay_ms = delays[frame_idx] as u64 * 10;
+fn schedule_next_frame(ui_weak: slint::Weak<AppWindow>, frame_idx: usize) {
+    let Some(ui) = ui_weak.upgrade() else { return };
+    let frames = ui.get_frames();
+    let delay_ms = frames
+        .row_data(frame_idx)
+        .map(|f| f.delay.max(2) as u64 * 10)
+        .unwrap_or(20);
+    let frame_count = frames.row_count();
+
     Timer::single_shot(std::time::Duration::from_millis(delay_ms), move || {
         let Some(ui) = ui_weak.upgrade() else { return };
-        // stopの場合は再帰処理をしないため停止する
         if !ui.get_is_play() {
             return;
         }
-        let next = (frame_idx + 1) % frames.len();
-        ui.set_gif_image(frames[next].clone());
+        let next = (frame_idx + 1) % frame_count;
         ui.set_selected_frame_index(next as i32);
-        schedule_next_frame(ui_weak, frames, delays, next);
+        schedule_next_frame(ui_weak, next);
     });
 }
 
@@ -93,13 +93,6 @@ fn main() -> Result<()> {
             ui.set_is_loading(false);
             match result {
                 Ok(gif_file) => {
-                    if let Some(image) = gif_file.frame_image(0) {
-                        // メイン画像更新
-                        ui.set_gif_image(image);
-                        // 選択中のフレームのインデックス更新
-                        ui.set_selected_frame_index(0);
-                    }
-
                     // 再生時間更新
                     let total_duration_cs: u32 = gif_file
                         .frames()
@@ -110,67 +103,31 @@ fn main() -> Result<()> {
                     let formatted = format!("{:02}:{:02}", total_seconds / 60, total_seconds % 60);
                     ui.set_total_duration(SharedString::from(formatted));
 
-                    let frames_rc = Rc::new(
-                        (0..gif_file.frames().len())
-                            .filter_map(|i| gif_file.frame_image(i))
-                            .collect::<Vec<slint::Image>>(),
-                    );
-                    let delays_rc = Rc::new(
-                        gif_file
-                            .frames()
-                            .iter()
-                            .map(|f| (f.delay as u32).max(2))
-                            .collect::<Vec<u32>>(),
-                    );
-                    let frames_model = Rc::new(VecModel::from((*frames_rc).clone()));
-                    let frames_model_ref = frames_model.clone();
-                    let frames_model_for_skip = frames_model_ref.clone();
-                    let frames_model_for_back = frames_model_for_skip.clone();
+                    // フレームデータ構築
+                    let frame_data: Vec<FrameData> = gif_file
+                        .frames()
+                        .iter()
+                        .enumerate()
+                        .filter_map(|(i, f)| {
+                            gif_file.frame_image(i).map(|img| FrameData {
+                                image: img,
+                                delay: (f.delay as i32).max(2),
+                            })
+                        })
+                        .collect();
+                    let frames_model = Rc::new(VecModel::from(frame_data));
                     // フレームタイムライン更新
                     ui.set_frames(ModelRc::from(frames_model));
+                    ui.set_selected_frame_index(0);
 
-                    // フレームタイムライン選択Callback
-                    let ui_weak_for_frame = ui.as_weak();
-                    ui.on_frame_selected(move |index| {
-                        if let Some(image) = frames_model_ref.row_data(index as usize) {
-                            if let Some(ui) = ui_weak_for_frame.upgrade() {
-                                ui.set_gif_image(image);
-                            }
-                        }
-                    });
-                    // skip-back buttonクリック時Callback
-                    let ui_weak_for_back = ui.as_weak();
-                    ui.on_skip_back(move |index| {
-                        if let Some(image) = frames_model_for_back.row_data(index as usize) {
-                            if let Some(ui) = ui_weak_for_back.upgrade() {
-                                ui.set_gif_image(image);
-                            }
-                        }
-                    });
-                    // skip-forward buttonクリック時Callback
-                    let ui_weak_for_skip = ui.as_weak();
-                    ui.on_skip_forward(move |index| {
-                        if let Some(image) = frames_model_for_skip.row_data(index as usize) {
-                            if let Some(ui) = ui_weak_for_skip.upgrade() {
-                                ui.set_gif_image(image);
-                            }
-                        }
-                    });
                     // 再生Callback
                     let ui_weak_for_play = ui.as_weak();
-                    let frames_for_play = frames_rc.clone();
-                    let delays_for_play = delays_rc.clone();
                     ui.on_play(move |start_index| {
                         let Some(ui) = ui_weak_for_play.upgrade() else {
                             return;
                         };
                         if ui.get_is_play() {
-                            schedule_next_frame(
-                                ui.as_weak(),
-                                frames_for_play.clone(),
-                                delays_for_play.clone(),
-                                start_index as usize,
-                            );
+                            schedule_next_frame(ui.as_weak(), start_index as usize);
                         }
                     });
                 }
