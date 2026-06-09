@@ -1,0 +1,118 @@
+import {
+    ScrollView,
+    StandardButton,
+    LineEdit,
+    Button,
+    Slider,
+} from "std-widgets.slint";
+import { SelectionGroup } from "selection-group.slint";
+
+export component ExportImageDialog inherits Dialog {
+    property <int> format-index: 0;
+    property <int> range-index: 0;
+    property <bool> is-jpeg: format-index == 1;
+    callback ok-clicked();
+
+    always-on-top: true;
+    padding: 16px;
+    title: "画像出力";
+    height: self.preferred-height;
+
+    VerticalLayout {
+        padding-bottom: 10px;
+        spacing: 20px;
+
+        VerticalLayout {
+            spacing: 10px;
+            Text {
+                text: "形式";
+                font-size: 14px;
+                font-weight: FontWeight.medium;
+                vertical-alignment: center;
+            }
+
+            SelectionGroup {
+                options: ["PNG", "JPEG"];
+                selected-index <=> root.format-index;
+            }
+        }
+
+        VerticalLayout {
+            spacing: 10px;
+            Text {
+                text: "範囲";
+                font-size: 14px;
+                font-weight: FontWeight.medium;
+                vertical-alignment: center;
+            }
+
+            SelectionGroup {
+                options: ["すべて", "現在のフレーム"];
+                selected-index <=> root.range-index;
+            }
+        }
+
+        VerticalLayout {
+            spacing: 10px;
+            Text {
+                text: "保存先";
+                font-size: 14px;
+                font-weight: FontWeight.medium;
+                vertical-alignment: center;
+            }
+
+            HorizontalLayout {
+                spacing: 10px;
+
+                LineEdit { }
+
+                Button {
+                    icon: @image-url("assets/folder-open.svg");
+                    colorize-icon: true;
+                }
+            }
+        }
+
+        if root.is-jpeg : VerticalLayout {
+            spacing: 10px;
+
+            Text {
+                text: "品質";
+                font-size: 14px;
+                font-weight: FontWeight.medium;
+                vertical-alignment: center;
+            }
+
+            HorizontalLayout {
+                Text {
+                    text: "0";
+                    vertical-alignment: center;
+                }
+
+                Slider {
+                    minimum: 0;
+                    maximum: 100;
+                    step: 1;
+                    value: 50;
+                }
+
+                Text {
+                    text: "100";
+                    vertical-alignment: center;
+                }
+            }
+        }
+    }
+
+    StandardButton {
+        kind: ok;
+        primary: true;
+        clicked => {
+            root.ok-clicked();
+        }
+    }
+
+    StandardButton {
+        kind: cancel;
+    }
+}

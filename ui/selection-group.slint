@@ -1,0 +1,48 @@
+import { Palette } from "std-widgets.slint";
+
+export component SelectionGroup {
+    in property <[string]> options: [];
+    in-out property <int> selected-index: 0;
+    callback selection-changed(int);
+
+    width: i-layout.preferred-width;
+    height: i-layout.preferred-height;
+
+    Rectangle {
+        border-color: Palette.border;
+        border-width: 1px;
+        border-radius: 4px;
+        background: Palette.foreground.transparentize(0.9);
+
+        i-layout := HorizontalLayout {
+            padding: 4px;
+            spacing: 4px;
+
+            for option[i] in root.options: TouchArea {
+                clicked => {
+                    root.selected-index = i;
+                    root.selection-changed(i);
+                }
+
+                Rectangle {
+                    border-radius: 4px;
+                    background: root.selected-index == i ? Palette.background : (parent.has-hover ? Palette.foreground.transparentize(0.85) : transparent);
+
+                    HorizontalLayout {
+                        padding-left: 14px;
+                        padding-right: 14px;
+                        padding-top: 8px;
+                        padding-bottom: 8px;
+                        Text {
+                            text: option;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                            color: root.selected-index == i ? Palette.accent-background : Palette.control-foreground;
+                            font-size: 13px;
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

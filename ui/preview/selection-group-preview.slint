@@ -1,0 +1,25 @@
+
+import { VerticalBox, Palette, Button } from "std-widgets.slint";
+import { SelectionGroup } from "../selection-group.slint";
+
+export component SelectionGroupPreview inherits Window {
+    width: 700px;
+    height: 200px;
+
+    property <int> format-index: 0;
+
+    VerticalLayout {
+        alignment: center;
+        padding: 20px;
+        spacing: 8px;
+
+        Button {
+            text: "PNG";
+        }
+
+        SelectionGroup {
+            options: ["PNG", "JPEG", "WebP"];
+            selected-index <=> format-index;
+        }
+    }
+}

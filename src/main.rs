@@ -16,6 +16,7 @@ slint::include_modules!();
 
 fn show_dialog(title: &str, message: &str, parent: &AppWindow) {
     let dialog = MessageDialog::new().unwrap();
+    dialog.global::<Palette>().set_color_scheme(parent.global::<Palette>().get_color_scheme());
     dialog.set_title_text(SharedString::from(title));
     dialog.set_message(SharedString::from(message));
     let dialog_weak = dialog.as_weak();
@@ -78,14 +79,14 @@ fn main() -> Result<()> {
 
     let gif_file_ref: Rc<RefCell<Option<GifFile>>> = Rc::new(RefCell::new(None));
 
-    // 画面最大化
-    let ui_weak = ui.as_weak();
-    slint::invoke_from_event_loop(move || {
-        if let Some(ui) = ui_weak.upgrade() {
-            ui.window().set_maximized(true);
-        }
-    })
-    .unwrap();
+    // 画面最大化 (仕様が変わるかもしれないため消さないこと!!)
+    // let ui_weak = ui.as_weak();
+    // slint::invoke_from_event_loop(move || {
+    //     if let Some(ui) = ui_weak.upgrade() {
+    //         ui.window().set_maximized(true);
+    //     }
+    // })
+    // .unwrap();
 
     // GIFファイル選択Callback
     let ui_weak = ui.as_weak();
@@ -184,6 +185,40 @@ fn main() -> Result<()> {
             }
         })
         .unwrap();
+    });
+
+    // 画像出力Callback
+    let ui_weak_image = ui.as_weak();
+    ui.on_export_selected_image(move || {
+        let Some(ui) = ui_weak_image.upgrade() else {
+            return;
+        };
+
+        let dialog = ExportImageDialog::new().unwrap();
+        dialog.global::<Palette>().set_color_scheme(ui.global::<Palette>().get_color_scheme());
+
+        let dialog_weak = dialog.as_weak();
+        dialog.on_ok_clicked(move || {
+            if let Some(d) = dialog_weak.upgrade() {
+                d.hide().unwrap();
+            }
+        });
+
+        let dialog_weak = dialog.as_weak();
+        dialog.on_cancel_clicked(move || {
+            if let Some(d) = dialog_weak.upgrade() {
+                d.hide().unwrap();
+            }
+        });
+
+        let pos = ui.window().position();
+        let size = ui.window().size();
+        dialog.window().set_position(slint::PhysicalPosition::new(
+            pos.x + size.width as i32 / 2,
+            pos.y + size.height as i32 / 2,
+        ));
+
+        dialog.show().unwrap();
     });
 
     ui.run()?;

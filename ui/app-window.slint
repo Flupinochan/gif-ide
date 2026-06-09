@@ -7,6 +7,9 @@ import {
     ScrollView,
 } from "std-widgets.slint";
 export { MessageDialog } from "message-dialog.slint";
+export { ExportImageDialog } from "export-image-dialog.slint";
+// ThemeはWindowごとに保有されるため、ExportしてDialogを開く際にThemeを必ず渡す
+export { Palette } from "std-widgets.slint";
 
 struct FrameData {
     image: image,
@@ -29,6 +32,7 @@ export component AppWindow inherits Window {
     callback show-test-dialog();
     callback play(int);
     callback export-gif();
+    callback export-selected-image();
 
     preferred-height: 560px;
     preferred-width: 900px;
@@ -116,6 +120,7 @@ export component AppWindow inherits Window {
                                 Button {
                                     icon: @image-url("assets/skip-back.svg");
                                     colorize-icon: true;
+                                    enabled: frames.length > 0;
                                     clicked => {
                                         let prev = selected-frame-index - 1;
                                         root.selected-frame-index = prev < 0 ? frames.length - 1 : prev;
@@ -129,6 +134,7 @@ export component AppWindow inherits Window {
                                     icon: is-play ? @image-url("assets/stop.svg") : @image-url("assets/play.svg");
                                     colorize-icon: true;
                                     primary: true;
+                                    enabled: frames.length > 0;
                                     clicked => {
                                         is-play = !is-play;
                                         root.play(selected-frame-index);
@@ -141,6 +147,7 @@ export component AppWindow inherits Window {
                                 Button {
                                     icon: @image-url("assets/skip-forward.svg");
                                     colorize-icon: true;
+                                    enabled: frames.length > 0;
                                     clicked => {
                                         let next = selected-frame-index + 1;
                                         root.selected-frame-index = next >= frames.length ? 0 : next;
@@ -149,7 +156,9 @@ export component AppWindow inherits Window {
                             }
                         }
 
-                        Slider { }
+                        Slider {
+                            enabled: frames.length > 0;
+                        }
 
                         HorizontalLayout {
                             alignment: center;
@@ -377,6 +386,14 @@ export component AppWindow inherits Window {
                         spacing: 4px;
                         alignment: center;
 
+                        // 小見出し
+                        Text {
+                            text: "GIF 情報";
+                            font-size: 13px;
+                            font-weight: FontWeight.medium;
+                            color: Palette.foreground.transparentize(0.3);
+                        }
+
                         // ファイル名
                         HorizontalLayout {
                             alignment: space-between;
@@ -443,13 +460,33 @@ export component AppWindow inherits Window {
                     // Export
                     VerticalLayout {
                         padding: 12px;
-                        spacing: 4px;
+                        spacing: 8px;
                         alignment: center;
+
+                        // 小見出し
+                        Text {
+                            text: "出力";
+                            font-size: 13px;
+                            font-weight: FontWeight.medium;
+                            color: Palette.foreground.transparentize(0.3);
+                        }
 
                         Button {
                             text: "GIF出力";
                             primary: true;
-                            clicked => { root.export-gif(); }
+                            enabled: frames.length > 0;
+                            clicked => {
+                                root.export-gif();
+                            }
+                        }
+
+                        Button {
+                            text: "画像出力";
+                            primary: true;
+                            enabled: frames.length > 0;
+                            clicked => {
+                                root.export-selected-image();
+                            }
                         }
                     }
 
