@@ -8,6 +8,7 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0.102"
 gif = "0.14.2"
+image = { version = "0.25.10", default-features = false, features = ["avif", "bmp", "ico", "jpeg", "png", "webp"] }
 rfd = "0.17.2"
 slint = "1.16.1"
 tokio = { version = "1.52.3", features = ["rt-multi-thread"] }

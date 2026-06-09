@@ -4,14 +4,17 @@ import {
     LineEdit,
     Button,
     Slider,
+    ComboBox,
 } from "std-widgets.slint";
 import { SelectionGroup } from "selection-group.slint";
 
 export component ExportImageDialog inherits Dialog {
-    property <int> format-index: 0;
-    property <int> range-index: 0;
-    property <bool> is-jpeg: format-index == 1;
+    in-out property <int> format-index: 0;
+    in-out property <int> range-index: 0;
+    out property <bool> is-jpeg: format-index == 1;
+    in-out property <string> save-path: "";
     callback ok-clicked();
+    callback pick-path();
 
     always-on-top: true;
     padding: 16px;
@@ -31,9 +34,9 @@ export component ExportImageDialog inherits Dialog {
                 vertical-alignment: center;
             }
 
-            SelectionGroup {
-                options: ["PNG", "JPEG"];
-                selected-index <=> root.format-index;
+            ComboBox {
+                model: ["PNG", "JPEG", "WEBP", "BMP", "ICO", "AVIF"];
+                current-index <=> root.format-index;
             }
         }
 
@@ -47,7 +50,7 @@ export component ExportImageDialog inherits Dialog {
             }
 
             SelectionGroup {
-                options: ["すべて", "現在のフレーム"];
+                options: ["現在のフレーム", "すべて"];
                 selected-index <=> root.range-index;
             }
         }
@@ -64,16 +67,21 @@ export component ExportImageDialog inherits Dialog {
             HorizontalLayout {
                 spacing: 10px;
 
-                LineEdit { }
+                LineEdit {
+                    text <=> root.save-path;
+                }
 
                 Button {
                     icon: @image-url("assets/folder-open.svg");
                     colorize-icon: true;
+                    clicked => {
+                        root.pick-path();
+                    }
                 }
             }
         }
 
-        if root.is-jpeg : VerticalLayout {
+        if root.is-jpeg: VerticalLayout {
             spacing: 10px;
 
             Text {

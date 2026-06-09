@@ -16,7 +16,9 @@ slint::include_modules!();
 
 fn show_dialog(title: &str, message: &str, parent: &AppWindow) {
     let dialog = MessageDialog::new().unwrap();
-    dialog.global::<Palette>().set_color_scheme(parent.global::<Palette>().get_color_scheme());
+    dialog
+        .global::<Palette>()
+        .set_color_scheme(parent.global::<Palette>().get_color_scheme());
     dialog.set_title_text(SharedString::from(title));
     dialog.set_message(SharedString::from(message));
     let dialog_weak = dialog.as_weak();
@@ -46,6 +48,24 @@ fn pick_gif_file() -> Option<PathBuf> {
 fn save_gif_file() -> Option<PathBuf> {
     FileDialog::new()
         .add_filter("GIF", &["gif"])
+        .set_title("保存先を選択してください")
+        .save_file()
+}
+
+// ExportImageDialogのformat-indexと対応 (表示名, 拡張子, image::ImageFormat)
+const IMAGE_FORMATS: [(&str, &str, image::ImageFormat); 6] = [
+    ("PNG", "png", image::ImageFormat::Png),
+    ("JPEG", "jpeg", image::ImageFormat::Jpeg),
+    ("WEBP", "webp", image::ImageFormat::WebP),
+    ("BMP", "bmp", image::ImageFormat::Bmp),
+    ("ICO", "ico", image::ImageFormat::Ico),
+    ("AVIF", "avif", image::ImageFormat::Avif),
+];
+
+fn save_image_file(format_index: i32) -> Option<PathBuf> {
+    let (name, ext, _) = IMAGE_FORMATS[format_index as usize];
+    FileDialog::new()
+        .add_filter(name, &[ext])
         .set_title("保存先を選択してください")
         .save_file()
 }
@@ -195,12 +215,47 @@ fn main() -> Result<()> {
         };
 
         let dialog = ExportImageDialog::new().unwrap();
-        dialog.global::<Palette>().set_color_scheme(ui.global::<Palette>().get_color_scheme());
+        dialog
+            .global::<Palette>()
+            .set_color_scheme(ui.global::<Palette>().get_color_scheme());
 
         let dialog_weak = dialog.as_weak();
+        let ui_weak_ok = ui.as_weak();
         dialog.on_ok_clicked(move || {
-            if let Some(d) = dialog_weak.upgrade() {
-                d.hide().unwrap();
+            let (Some(dialog), Some(ui)) = (dialog_weak.upgrade(), ui_weak_ok.upgrade()) else {
+                return;
+            };
+
+            // TODO: JPEG出力と「すべて」の出力は未実装
+            if dialog.get_is_jpeg() || dialog.get_range_index() != 0 {
+                return;
+            }
+
+            // 以降はJPEG以外で現在のフレームを出力する場合の処理
+            let path = dialog.get_save_path();
+            let frame_index = ui.get_selected_frame_index() as usize;
+            let Some(frame) = ui.get_frames().row_data(frame_index) else {
+                return;
+            };
+            let Some(buffer) = frame.image.to_rgba8() else {
+                return;
+            };
+            let (_, _, format) = IMAGE_FORMATS[dialog.get_format_index() as usize];
+
+            // TODO: ICOは幅・高さとも1..=256の制約があるため、imageops::resizeで
+            // アスペクト比を保ったまま縮小し、ユーザーにサイズ(256/128/64/32など)を選択させる必要がある
+            let result = image::save_buffer_with_format(
+                path.as_str(),
+                buffer.as_bytes(),
+                buffer.width(),
+                buffer.height(),
+                image::ColorType::Rgba8,
+                format,
+            );
+
+            match result {
+                Ok(()) => dialog.hide().unwrap(),
+                Err(e) => show_dialog("エラー", &format!("画像の出力に失敗しました: {}", e), &ui),
             }
         });
 
@@ -209,6 +264,17 @@ fn main() -> Result<()> {
             if let Some(d) = dialog_weak.upgrade() {
                 d.hide().unwrap();
             }
+        });
+
+        let dialog_weak = dialog.as_weak();
+        dialog.on_pick_path(move || {
+            let Some(dialog) = dialog_weak.upgrade() else {
+                return;
+            };
+            let Some(path) = save_image_file(dialog.get_format_index()) else {
+                return;
+            };
+            dialog.set_save_path(SharedString::from(path.to_string_lossy().into_owned()));
         });
 
         let pos = ui.window().position();
