@@ -8,9 +8,17 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0.102"
 gif = "0.14.2"
-image = { version = "0.25.10", default-features = false, features = ["avif", "bmp", "ico", "jpeg", "png", "webp"] }
+image = { version = "0.25.10", default-features = false, features = [
+    "avif",
+    "bmp",
+    "ico",
+    "jpeg",
+    "png",
+    "webp",
+] }
+raw-window-handle = "0.6.2"
 rfd = "0.17.2"
-slint = "1.16.1"
+slint = { version = "1.16.1", features = ["raw-window-handle-06"] }
 tokio = { version = "1.52.3", features = ["rt-multi-thread"] }
 
 [build-dependencies]
@@ -19,3 +27,6 @@ slint-build = "1.16.1"
 [profile.release]
 codegen-units = 1
 lto = true
+
+[target."cfg(windows)".dependencies]
+windows-sys = { version = "0.61.2", features = ["Win32_Foundation", "Win32_UI_WindowsAndMessaging"] }

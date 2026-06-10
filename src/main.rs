@@ -4,7 +4,7 @@
 mod gif_data;
 
 use anyhow::Result;
-use rfd::FileDialog;
+use rfd::AsyncFileDialog;
 use slint::{Model, ModelRc, SharedString, Timer, VecModel};
 use std::cell::RefCell;
 use std::path::PathBuf;
@@ -37,19 +37,22 @@ fn show_dialog(title: &str, message: &str, parent: &AppWindow) {
     dialog.show().unwrap();
 }
 
-fn pick_gif_file() -> Option<PathBuf> {
-    FileDialog::new()
+async fn pick_gif_file() -> Option<PathBuf> {
+    AsyncFileDialog::new()
         .add_filter("GIF", &["gif"])
-        .set_directory("/")
         .set_title("GIFを選択してください")
         .pick_file()
+        .await
+        .map(|handle| handle.path().to_path_buf())
 }
 
-fn save_gif_file() -> Option<PathBuf> {
-    FileDialog::new()
+async fn save_gif_file() -> Option<PathBuf> {
+    AsyncFileDialog::new()
         .add_filter("GIF", &["gif"])
         .set_title("保存先を選択してください")
         .save_file()
+        .await
+        .map(|handle| handle.path().to_path_buf())
 }
 
 // ExportImageDialogのformat-indexと対応 (表示名, 拡張子, image::ImageFormat)
@@ -62,13 +65,39 @@ const IMAGE_FORMATS: [(&str, &str, image::ImageFormat); 6] = [
     ("AVIF", "avif", image::ImageFormat::Avif),
 ];
 
-fn save_image_file(format_index: i32) -> Option<PathBuf> {
+async fn save_image_file(format_index: i32) -> Option<PathBuf> {
     let (name, ext, _) = IMAGE_FORMATS[format_index as usize];
-    FileDialog::new()
+    AsyncFileDialog::new()
         .add_filter(name, &[ext])
         .set_title("保存先を選択してください")
         .save_file()
+        .await
+        .map(|handle| handle.path().to_path_buf())
 }
+
+// すでにwindowが表示中の場合は2重表示せず最前面に表示
+#[cfg(windows)]
+fn focus_window(window: &slint::Window) {
+    use raw_window_handle::{HasWindowHandle, RawWindowHandle};
+    use windows_sys::Win32::UI::WindowsAndMessaging::{
+        SetForegroundWindow, ShowWindow, SW_RESTORE,
+    };
+
+    let slint_handle = window.window_handle();
+    let Ok(handle) = slint_handle.window_handle() else {
+        return;
+    };
+    if let RawWindowHandle::Win32(handle) = handle.as_raw() {
+        let hwnd = handle.hwnd.get() as *mut std::ffi::c_void;
+        unsafe {
+            ShowWindow(hwnd, SW_RESTORE);
+            SetForegroundWindow(hwnd);
+        }
+    }
+}
+
+#[cfg(not(windows))]
+fn focus_window(_window: &slint::Window) {}
 
 // 再帰処理で再生機能を実装
 fn schedule_next_frame(ui_weak: slint::Weak<AppWindow>, frame_idx: usize) {
@@ -96,8 +125,20 @@ fn main() -> Result<()> {
     let _guard = rt.enter();
 
     let ui = AppWindow::new()?;
+    let export_dialog = ExportImageDialog::new()?;
 
     let gif_file_ref: Rc<RefCell<Option<GifFile>>> = Rc::new(RefCell::new(None));
+
+    // 再生Callback
+    let ui_weak_for_play = ui.as_weak();
+    ui.on_play(move |start_index| {
+        let Some(ui) = ui_weak_for_play.upgrade() else {
+            return;
+        };
+        if ui.get_is_play() {
+            schedule_next_frame(ui.as_weak(), start_index as usize);
+        }
+    });
 
     // 画面最大化 (仕様が変わるかもしれないため消さないこと!!)
     // let ui_weak = ui.as_weak();
@@ -112,21 +153,26 @@ fn main() -> Result<()> {
     let ui_weak = ui.as_weak();
     let gif_ref_open = gif_file_ref.clone();
     ui.on_pick_gif(move || {
-        let Some(path_buf) = pick_gif_file() else {
-            return;
-        };
-        let filename = path_buf
-            .file_name()
-            .map(|n| n.to_string_lossy().into_owned())
-            .unwrap_or_default();
-
         let Some(ui) = ui_weak.upgrade() else { return };
-        ui.set_is_loading(true);
+        let ui_weak = ui.as_weak();
         let gif_ref = gif_ref_open.clone();
         slint::spawn_local(async move {
+            let Some(path_buf) = pick_gif_file().await else {
+                return;
+            };
+            let filename = path_buf
+                .file_name()
+                .map(|n| n.to_string_lossy().into_owned())
+                .unwrap_or_default();
+
+            let Some(ui) = ui_weak.upgrade() else { return };
+            ui.set_is_loading(true);
+
             let result = tokio::task::spawn_blocking(move || GifFile::new(&path_buf))
                 .await
                 .unwrap();
+
+            let Some(ui) = ui_weak.upgrade() else { return };
             ui.set_is_loading(false);
             match result {
                 Ok(gif_file) => {
@@ -160,17 +206,6 @@ fn main() -> Result<()> {
                     ui.set_current_filename(SharedString::from(filename));
                     ui.set_canvas_width(gif_file.canvas_width as i32);
                     ui.set_canvas_height(gif_file.canvas_height as i32);
-
-                    // 再生Callback
-                    let ui_weak_for_play = ui.as_weak();
-                    ui.on_play(move |start_index| {
-                        let Some(ui) = ui_weak_for_play.upgrade() else {
-                            return;
-                        };
-                        if ui.get_is_play() {
-                            schedule_next_frame(ui.as_weak(), start_index as usize);
-                        }
-                    });
                 }
                 Err(e) => {
                     show_dialog(
@@ -188,11 +223,17 @@ fn main() -> Result<()> {
     let ui_weak_export = ui.as_weak();
     let gif_ref_export = gif_file_ref.clone();
     ui.on_export_gif(move || {
-        let Some(path) = save_gif_file() else { return };
+        let Some(ui) = ui_weak_export.upgrade() else {
+            return;
+        };
         let gif_clone = gif_ref_export.borrow().clone();
         let Some(gif) = gif_clone else { return };
-        let ui_weak = ui_weak_export.clone();
+        let ui_weak = ui.as_weak();
         slint::spawn_local(async move {
+            let Some(path) = save_gif_file().await else {
+                return;
+            };
+
             let result = tokio::task::spawn_blocking(move || gif.export(&path))
                 .await
                 .unwrap();
@@ -207,75 +248,108 @@ fn main() -> Result<()> {
         .unwrap();
     });
 
-    // 画像出力Callback
-    let ui_weak_image = ui.as_weak();
-    ui.on_export_selected_image(move || {
-        let Some(ui) = ui_weak_image.upgrade() else {
+    // 画像出力ダイアログCallback
+    let ui_weak_ok = ui.as_weak();
+    let export_dialog_weak_ok = export_dialog.as_weak();
+    export_dialog.on_ok_clicked(move || {
+        let (Some(dialog), Some(ui)) = (export_dialog_weak_ok.upgrade(), ui_weak_ok.upgrade())
+        else {
             return;
         };
 
-        let dialog = ExportImageDialog::new().unwrap();
+        // TODO: JPEG出力と「すべて」の出力は未実装
+        if dialog.get_is_jpeg() || dialog.get_range_index() != 0 {
+            return;
+        }
+
+        // 以降はJPEG以外で現在のフレームを出力する場合の処理
+        let path = PathBuf::from(dialog.get_save_path().as_str());
+        let frame_index = ui.get_selected_frame_index() as usize;
+        let Some(frame) = ui.get_frames().row_data(frame_index) else {
+            return;
+        };
+        let Some(buffer) = frame.image.to_rgba8() else {
+            return;
+        };
+        let (_, _, format) = IMAGE_FORMATS[dialog.get_format_index() as usize];
+
+        // TODO: ICOは幅・高さとも1..=256の制約があるため、imageops::resizeで
+        // アスペクト比を保ったまま縮小し、ユーザーにサイズ(256/128/64/32など)を選択させる必要がある
+        let dialog_weak = dialog.as_weak();
+        let ui_weak = ui.as_weak();
+        slint::spawn_local(async move {
+            let result = tokio::task::spawn_blocking(move || {
+                image::save_buffer_with_format(
+                    path,
+                    buffer.as_bytes(),
+                    buffer.width(),
+                    buffer.height(),
+                    image::ColorType::Rgba8,
+                    format,
+                )
+            })
+            .await
+            .unwrap();
+
+            let _ = slint::invoke_from_event_loop(move || match result {
+                Ok(()) => {
+                    if let Some(dialog) = dialog_weak.upgrade() {
+                        dialog.hide().unwrap();
+                    }
+                }
+                Err(e) => {
+                    if let Some(ui) = ui_weak.upgrade() {
+                        show_dialog("エラー", &format!("画像の出力に失敗しました: {}", e), &ui);
+                    }
+                }
+            });
+        })
+        .unwrap();
+    });
+
+    let export_dialog_weak_cancel = export_dialog.as_weak();
+    export_dialog.on_cancel_clicked(move || {
+        if let Some(d) = export_dialog_weak_cancel.upgrade() {
+            d.hide().unwrap();
+        }
+    });
+
+    let export_dialog_weak_pick = export_dialog.as_weak();
+    export_dialog.on_pick_path(move || {
+        let Some(dialog) = export_dialog_weak_pick.upgrade() else {
+            return;
+        };
+
+        let format_index = dialog.get_format_index();
+        let dialog_weak = dialog.as_weak();
+        slint::spawn_local(async move {
+            let path = save_image_file(format_index).await;
+
+            let _ = slint::invoke_from_event_loop(move || {
+                let Some(dialog) = dialog_weak.upgrade() else {
+                    return;
+                };
+                if let Some(path) = path {
+                    dialog.set_save_path(SharedString::from(path.to_string_lossy().into_owned()));
+                }
+            });
+        })
+        .unwrap();
+    });
+
+    // 画像出力Callback
+    let ui_weak_image = ui.as_weak();
+    let export_dialog_weak_show = export_dialog.as_weak();
+    ui.on_export_selected_image(move || {
+        let (Some(ui), Some(dialog)) = (ui_weak_image.upgrade(), export_dialog_weak_show.upgrade())
+        else {
+            return;
+        };
+
         dialog
             .global::<Palette>()
             .set_color_scheme(ui.global::<Palette>().get_color_scheme());
-
-        let dialog_weak = dialog.as_weak();
-        let ui_weak_ok = ui.as_weak();
-        dialog.on_ok_clicked(move || {
-            let (Some(dialog), Some(ui)) = (dialog_weak.upgrade(), ui_weak_ok.upgrade()) else {
-                return;
-            };
-
-            // TODO: JPEG出力と「すべて」の出力は未実装
-            if dialog.get_is_jpeg() || dialog.get_range_index() != 0 {
-                return;
-            }
-
-            // 以降はJPEG以外で現在のフレームを出力する場合の処理
-            let path = dialog.get_save_path();
-            let frame_index = ui.get_selected_frame_index() as usize;
-            let Some(frame) = ui.get_frames().row_data(frame_index) else {
-                return;
-            };
-            let Some(buffer) = frame.image.to_rgba8() else {
-                return;
-            };
-            let (_, _, format) = IMAGE_FORMATS[dialog.get_format_index() as usize];
-
-            // TODO: ICOは幅・高さとも1..=256の制約があるため、imageops::resizeで
-            // アスペクト比を保ったまま縮小し、ユーザーにサイズ(256/128/64/32など)を選択させる必要がある
-            let result = image::save_buffer_with_format(
-                path.as_str(),
-                buffer.as_bytes(),
-                buffer.width(),
-                buffer.height(),
-                image::ColorType::Rgba8,
-                format,
-            );
-
-            match result {
-                Ok(()) => dialog.hide().unwrap(),
-                Err(e) => show_dialog("エラー", &format!("画像の出力に失敗しました: {}", e), &ui),
-            }
-        });
-
-        let dialog_weak = dialog.as_weak();
-        dialog.on_cancel_clicked(move || {
-            if let Some(d) = dialog_weak.upgrade() {
-                d.hide().unwrap();
-            }
-        });
-
-        let dialog_weak = dialog.as_weak();
-        dialog.on_pick_path(move || {
-            let Some(dialog) = dialog_weak.upgrade() else {
-                return;
-            };
-            let Some(path) = save_image_file(dialog.get_format_index()) else {
-                return;
-            };
-            dialog.set_save_path(SharedString::from(path.to_string_lossy().into_owned()));
-        });
+        dialog.set_state(ExportState::Form);
 
         let pos = ui.window().position();
         let size = ui.window().size();
@@ -285,6 +359,7 @@ fn main() -> Result<()> {
         ));
 
         dialog.show().unwrap();
+        focus_window(dialog.window());
     });
 
     ui.run()?;
