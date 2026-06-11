@@ -55,7 +55,7 @@ async fn save_gif_file() -> Option<PathBuf> {
         .map(|handle| handle.path().to_path_buf())
 }
 
-// ExportImageDialogのformat-indexと対応 (表示名, 拡張子, image::ImageFormat)
+// ExportImageWindowのformat-indexと対応 (表示名, 拡張子, image::ImageFormat)
 const IMAGE_FORMATS: [(&str, &str, image::ImageFormat); 6] = [
     ("PNG", "png", image::ImageFormat::Png),
     ("JPEG", "jpeg", image::ImageFormat::Jpeg),
@@ -99,6 +99,20 @@ fn focus_window(window: &slint::Window) {
 #[cfg(not(windows))]
 fn focus_window(_window: &slint::Window) {}
 
+// ファイル出力先Explorerを表示
+#[cfg(windows)]
+fn open_in_explorer(path: &std::path::Path) {
+    use std::os::windows::process::CommandExt;
+    use std::process::Command;
+
+    let _ = Command::new("explorer")
+        .raw_arg(format!("/select,\"{}\"", path.display()))
+        .spawn();
+}
+
+#[cfg(not(windows))]
+fn open_in_explorer(_path: &std::path::Path) {}
+
 // 再帰処理で再生機能を実装
 fn schedule_next_frame(ui_weak: slint::Weak<AppWindow>, frame_idx: usize) {
     let Some(ui) = ui_weak.upgrade() else { return };
@@ -125,7 +139,7 @@ fn main() -> Result<()> {
     let _guard = rt.enter();
 
     let ui = AppWindow::new()?;
-    let export_dialog = ExportImageDialog::new()?;
+    let export_window = ExportImageWindow::new()?;
 
     let gif_file_ref: Rc<RefCell<Option<GifFile>>> = Rc::new(RefCell::new(None));
 
@@ -248,22 +262,23 @@ fn main() -> Result<()> {
         .unwrap();
     });
 
-    // 画像出力ダイアログCallback
+    // 画像出力ウィンドウCallback
     let ui_weak_ok = ui.as_weak();
-    let export_dialog_weak_ok = export_dialog.as_weak();
-    export_dialog.on_ok_clicked(move || {
-        let (Some(dialog), Some(ui)) = (export_dialog_weak_ok.upgrade(), ui_weak_ok.upgrade())
+    let export_window_weak_ok = export_window.as_weak();
+    export_window.on_ok_clicked(move || {
+        let (Some(export_window), Some(ui)) =
+            (export_window_weak_ok.upgrade(), ui_weak_ok.upgrade())
         else {
             return;
         };
 
         // TODO: JPEG出力と「すべて」の出力は未実装
-        if dialog.get_is_jpeg() || dialog.get_range_index() != 0 {
+        if export_window.get_is_jpeg() || export_window.get_range_index() != 0 {
             return;
         }
 
         // 以降はJPEG以外で現在のフレームを出力する場合の処理
-        let path = PathBuf::from(dialog.get_save_path().as_str());
+        let path = PathBuf::from(export_window.get_save_path().as_str());
         let frame_index = ui.get_selected_frame_index() as usize;
         let Some(frame) = ui.get_frames().row_data(frame_index) else {
             return;
@@ -271,11 +286,11 @@ fn main() -> Result<()> {
         let Some(buffer) = frame.image.to_rgba8() else {
             return;
         };
-        let (_, _, format) = IMAGE_FORMATS[dialog.get_format_index() as usize];
+        let (_, _, format) = IMAGE_FORMATS[export_window.get_format_index() as usize];
 
         // TODO: ICOは幅・高さとも1..=256の制約があるため、imageops::resizeで
         // アスペクト比を保ったまま縮小し、ユーザーにサイズ(256/128/64/32など)を選択させる必要がある
-        let dialog_weak = dialog.as_weak();
+        let export_window_weak = export_window.as_weak();
         let ui_weak = ui.as_weak();
         slint::spawn_local(async move {
             let result = tokio::task::spawn_blocking(move || {
@@ -293,8 +308,8 @@ fn main() -> Result<()> {
 
             let _ = slint::invoke_from_event_loop(move || match result {
                 Ok(()) => {
-                    if let Some(dialog) = dialog_weak.upgrade() {
-                        dialog.hide().unwrap();
+                    if let Some(export_window) = export_window_weak.upgrade() {
+                        export_window.set_state(ExportState::Success);
                     }
                 }
                 Err(e) => {
@@ -307,30 +322,40 @@ fn main() -> Result<()> {
         .unwrap();
     });
 
-    let export_dialog_weak_cancel = export_dialog.as_weak();
-    export_dialog.on_cancel_clicked(move || {
-        if let Some(d) = export_dialog_weak_cancel.upgrade() {
+    let export_window_weak_cancel = export_window.as_weak();
+    export_window.on_cancel_clicked(move || {
+        if let Some(d) = export_window_weak_cancel.upgrade() {
             d.hide().unwrap();
         }
     });
 
-    let export_dialog_weak_pick = export_dialog.as_weak();
-    export_dialog.on_pick_path(move || {
-        let Some(dialog) = export_dialog_weak_pick.upgrade() else {
+    let export_window_weak_open = export_window.as_weak();
+    export_window.on_open_clicked(move || {
+        let Some(export_window) = export_window_weak_open.upgrade() else {
+            return;
+        };
+        let path = PathBuf::from(export_window.get_save_path().as_str());
+        open_in_explorer(&path);
+    });
+
+    let export_window_weak_pick = export_window.as_weak();
+    export_window.on_pick_path(move || {
+        let Some(export_window) = export_window_weak_pick.upgrade() else {
             return;
         };
 
-        let format_index = dialog.get_format_index();
-        let dialog_weak = dialog.as_weak();
+        let format_index = export_window.get_format_index();
+        let export_window_weak = export_window.as_weak();
         slint::spawn_local(async move {
             let path = save_image_file(format_index).await;
 
             let _ = slint::invoke_from_event_loop(move || {
-                let Some(dialog) = dialog_weak.upgrade() else {
+                let Some(export_window) = export_window_weak.upgrade() else {
                     return;
                 };
                 if let Some(path) = path {
-                    dialog.set_save_path(SharedString::from(path.to_string_lossy().into_owned()));
+                    export_window
+                        .set_save_path(SharedString::from(path.to_string_lossy().into_owned()));
                 }
             });
         })
@@ -339,27 +364,30 @@ fn main() -> Result<()> {
 
     // 画像出力Callback
     let ui_weak_image = ui.as_weak();
-    let export_dialog_weak_show = export_dialog.as_weak();
+    let export_window_weak_show = export_window.as_weak();
     ui.on_export_selected_image(move || {
-        let (Some(ui), Some(dialog)) = (ui_weak_image.upgrade(), export_dialog_weak_show.upgrade())
+        let (Some(ui), Some(export_window)) =
+            (ui_weak_image.upgrade(), export_window_weak_show.upgrade())
         else {
             return;
         };
 
-        dialog
+        export_window
             .global::<Palette>()
             .set_color_scheme(ui.global::<Palette>().get_color_scheme());
-        dialog.set_state(ExportState::Form);
+        export_window.set_state(ExportState::Form);
 
         let pos = ui.window().position();
         let size = ui.window().size();
-        dialog.window().set_position(slint::PhysicalPosition::new(
-            pos.x + size.width as i32 / 2,
-            pos.y + size.height as i32 / 2,
-        ));
+        export_window
+            .window()
+            .set_position(slint::PhysicalPosition::new(
+                pos.x + size.width as i32 / 2,
+                pos.y + size.height as i32 / 2,
+            ));
 
-        dialog.show().unwrap();
-        focus_window(dialog.window());
+        export_window.show().unwrap();
+        focus_window(export_window.window());
     });
 
     ui.run()?;

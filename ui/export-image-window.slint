@@ -1,0 +1,199 @@
+import {
+    ScrollView,
+    StandardButton,
+    LineEdit,
+    Button,
+    Slider,
+    ComboBox,
+    Spinner,
+    Palette,
+} from "std-widgets.slint";
+import { SelectionGroup } from "selection-group.slint";
+
+export enum ExportState {
+    form,
+    processing,
+    success,
+}
+
+export component ExportImageWindow inherits Window {
+    in-out property <int> format-index: 0;
+    in-out property <int> range-index: 0;
+    out property <bool> is-jpeg: format-index == 1;
+    in-out property <string> save-path: "";
+    in property <ExportState> state: ExportState.form;
+    callback ok-clicked();
+    callback cancel-clicked();
+    callback pick-path();
+    callback open-clicked();
+
+    // FileDialogと干渉するため設定しないこと
+    // always-on-top: true;
+    title: "画像出力";
+    height: self.preferred-height;
+
+    VerticalLayout {
+        padding: 16px;
+        spacing: 16px;
+
+        if root.state == ExportState.success: Rectangle {
+            background: Colors.green.transparentize(0.85);
+            border-radius: 6px;
+
+            HorizontalLayout {
+                padding: 10px;
+                spacing: 10px;
+                alignment: space-between;
+
+                HorizontalLayout {
+                    spacing: 10px;
+                    alignment: start;
+
+                    Image {
+                        source: @image-url("assets/check.svg");
+                        colorize: Colors.green;
+                        width: 16px;
+                        height: 16px;
+                    }
+
+                    Text {
+                        text: "出力に成功しました";
+                        vertical-alignment: center;
+                        color: Colors.darkgreen;
+                    }
+                }
+
+                TouchArea {
+                    width: open-text.preferred-width;
+                    height: open-text.preferred-height;
+                    mouse-cursor: pointer;
+                    clicked => {
+                        root.open-clicked();
+                    }
+
+                    open-text := Text {
+                        text: "開く";
+                        vertical-alignment: center;
+                        color: Palette.accent-background;
+                    }
+                }
+            }
+        }
+
+        VerticalLayout {
+            spacing: 10px;
+            Text {
+                text: "形式";
+                font-size: 14px;
+                font-weight: FontWeight.medium;
+                vertical-alignment: center;
+            }
+
+            ComboBox {
+                model: ["PNG", "JPEG", "WEBP", "BMP", "ICO", "AVIF"];
+                current-index <=> root.format-index;
+                selected(current-value) => {
+                    root.save-path = "";
+                }
+            }
+        }
+
+        VerticalLayout {
+            spacing: 10px;
+            Text {
+                text: "範囲";
+                font-size: 14px;
+                font-weight: FontWeight.medium;
+                vertical-alignment: center;
+            }
+
+            SelectionGroup {
+                options: ["現在のフレーム", "すべて"];
+                selected-index <=> root.range-index;
+            }
+        }
+
+        VerticalLayout {
+            spacing: 10px;
+            Text {
+                text: "保存先";
+                font-size: 14px;
+                font-weight: FontWeight.medium;
+                vertical-alignment: center;
+            }
+
+            HorizontalLayout {
+                spacing: 10px;
+
+                LineEdit {
+                    text <=> root.save-path;
+                }
+
+                Button {
+                    icon: @image-url("assets/folder-open.svg");
+                    colorize-icon: true;
+                    clicked => {
+                        root.pick-path();
+                    }
+                }
+            }
+        }
+
+        if root.is-jpeg: VerticalLayout {
+            spacing: 10px;
+
+            Text {
+                text: "品質";
+                font-size: 14px;
+                font-weight: FontWeight.medium;
+                vertical-alignment: center;
+            }
+
+            HorizontalLayout {
+                Text {
+                    text: "0";
+                    vertical-alignment: center;
+                }
+
+                Slider {
+                    minimum: 0;
+                    maximum: 100;
+                    step: 1;
+                    value: 50;
+                }
+
+                Text {
+                    text: "100";
+                    vertical-alignment: center;
+                }
+            }
+        }
+
+        HorizontalLayout {
+            alignment: end;
+            padding-top: 10px;
+            spacing: 10px;
+
+            if root.state == ExportState.form || root.state == ExportState.success: Button {
+                text: "OK";
+                primary: true;
+                enabled: root.save-path != "";
+                clicked => {
+                    root.ok-clicked();
+                }
+            }
+
+            if root.state == ExportState.processing: Spinner {
+                indeterminate: true;
+            }
+
+            Button {
+                text: "Cancel";
+                enabled: root.state == ExportState.form || root.state == ExportState.success;
+                clicked => {
+                    root.cancel-clicked();
+                }
+            }
+        }
+    }
+}
