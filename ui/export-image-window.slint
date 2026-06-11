@@ -9,6 +9,7 @@ import {
     Palette,
 } from "std-widgets.slint";
 import { SelectionGroup } from "selection-group.slint";
+import { Style } from "global-styles.slint";
 
 export enum ExportState {
     form,
@@ -21,6 +22,7 @@ export component ExportImageWindow inherits Window {
     in-out property <int> range-index: 0;
     out property <bool> is-jpeg: format-index == 1;
     in-out property <string> save-path: "";
+    in-out property <float> quality: 100;
     in property <ExportState> state: ExportState.form;
     callback ok-clicked();
     callback cancel-clicked();
@@ -30,6 +32,7 @@ export component ExportImageWindow inherits Window {
     // FileDialogと干渉するため設定しないこと
     // always-on-top: true;
     title: "画像出力";
+    default-font-family: Style.font-family;
     height: self.preferred-height;
 
     VerticalLayout {
@@ -142,29 +145,39 @@ export component ExportImageWindow inherits Window {
         if root.is-jpeg: VerticalLayout {
             spacing: 10px;
 
-            Text {
-                text: "品質";
-                font-size: 14px;
-                font-weight: FontWeight.medium;
-                vertical-alignment: center;
+            HorizontalLayout {
+                alignment: start;
+                spacing: 8px;
+                Text {
+                    text: "品質";
+                    font-size: 14px;
+                    font-weight: FontWeight.medium;
+                    vertical-alignment: center;
+                }
+
+                Text {
+                    text: round(root.quality);
+                    font-size: 14px;
+                    vertical-alignment: center;
+                }
             }
 
             HorizontalLayout {
+                spacing: 4px;
+
                 Text {
                     text: "0";
-                    vertical-alignment: center;
                 }
 
                 Slider {
                     minimum: 0;
                     maximum: 100;
                     step: 1;
-                    value: 50;
+                    value <=> root.quality;
                 }
 
                 Text {
                     text: "100";
-                    vertical-alignment: center;
                 }
             }
         }

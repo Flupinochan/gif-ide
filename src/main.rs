@@ -65,6 +65,22 @@ const IMAGE_FORMATS: [(&str, &str, image::ImageFormat); 6] = [
     ("AVIF", "avif", image::ImageFormat::Avif),
 ];
 
+// JPEGはアルファチャンネル非対応のため、透過部分を白背景に合成してRGBに変換する
+// TODO: 背景色は固定で白としているが、将来的にユーザーが選択できるようにする
+fn rgba_to_rgb_with_white_background(image: image::RgbaImage) -> image::RgbImage {
+    let (width, height) = image.dimensions();
+    let mut rgb = image::RgbImage::new(width, height);
+
+    for (src, dst) in image.pixels().zip(rgb.pixels_mut()) {
+        let alpha = src[3] as f32 / 255.0;
+        for ch in 0..3 {
+            dst[ch] = (src[ch] as f32 * alpha + 255.0 * (1.0 - alpha)).round() as u8;
+        }
+    }
+
+    rgb
+}
+
 async fn save_image_file(format_index: i32) -> Option<PathBuf> {
     let (name, ext, _) = IMAGE_FORMATS[format_index as usize];
     AsyncFileDialog::new()
@@ -263,12 +279,11 @@ fn main() -> Result<()> {
             return;
         };
 
-        // TODO: JPEG出力と「すべて」の出力は未実装
-        if export_window.get_is_jpeg() || export_window.get_range_index() != 0 {
+        // TODO: 「すべて」の出力は未実装
+        if export_window.get_range_index() != 0 {
             return;
         }
 
-        // 以降はJPEG以外で現在のフレームを出力する場合の処理
         let path = PathBuf::from(export_window.get_save_path().as_str());
         let frame_index = ui.get_selected_frame_index() as usize;
         let Some(frame) = ui.get_frames().row_data(frame_index) else {
@@ -278,21 +293,42 @@ fn main() -> Result<()> {
             return;
         };
         let (_, _, format) = IMAGE_FORMATS[export_window.get_format_index() as usize];
+        let is_jpeg = export_window.get_is_jpeg();
+        let quality = export_window.get_quality() as u8;
 
         // TODO: ICOは幅・高さとも1..=256の制約があるため、imageops::resizeで
         // アスペクト比を保ったまま縮小し、ユーザーにサイズ(256/128/64/32など)を選択させる必要がある
         let export_window_weak = export_window.as_weak();
         let ui_weak = ui.as_weak();
         slint::spawn_local(async move {
-            let result = tokio::task::spawn_blocking(move || {
-                image::save_buffer_with_format(
-                    path,
-                    buffer.as_bytes(),
-                    buffer.width(),
-                    buffer.height(),
-                    image::ColorType::Rgba8,
-                    format,
-                )
+            let result = tokio::task::spawn_blocking(move || -> image::ImageResult<()> {
+                if is_jpeg {
+                    let rgba = image::RgbaImage::from_raw(
+                        buffer.width(),
+                        buffer.height(),
+                        buffer.as_bytes().to_vec(),
+                    )
+                    .expect("invalid image buffer");
+                    let rgb = rgba_to_rgb_with_white_background(rgba);
+                    let writer = std::io::BufWriter::new(std::fs::File::create(&path)?);
+                    let mut encoder =
+                        image::codecs::jpeg::JpegEncoder::new_with_quality(writer, quality);
+                    encoder.encode(
+                        rgb.as_raw(),
+                        rgb.width(),
+                        rgb.height(),
+                        image::ExtendedColorType::Rgb8,
+                    )
+                } else {
+                    image::save_buffer_with_format(
+                        &path,
+                        buffer.as_bytes(),
+                        buffer.width(),
+                        buffer.height(),
+                        image::ColorType::Rgba8,
+                        format,
+                    )
+                }
             })
             .await
             .unwrap();

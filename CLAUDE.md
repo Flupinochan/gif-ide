@@ -6,6 +6,17 @@
 cargo buildも不要です。無意味のためです。コンパイルエラーはvscode画面上で確認できます
 Cargo.toml の dependencies / build-dependencies に新しい依存関係を勝手に追加しないでください。追加が必要な場合は、追加理由を説明したうえで必ずユーザに確認を取ってください
 
+コード修正後は以下を実行し、エラー・警告を解消してください
+
+# リンター
+cargo clippy
+
+# フォーマッター
+cargo fmt
+
+# 構文チェック
+cargo check
+
 ## Architecture
 
 このプロジェクトは **Slint + Rust** による GIF再生・編集アプリケーションです

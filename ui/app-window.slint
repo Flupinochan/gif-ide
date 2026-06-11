@@ -6,6 +6,7 @@ import {
     Slider,
     ScrollView,
 } from "std-widgets.slint";
+import { Style } from "global-styles.slint";
 export { MessageDialog } from "message-dialog.slint";
 export { ExportImageWindow } from "export-image-window.slint";
 // ThemeはWindowごとに保有されるため、ExportしてDialogを開く際にThemeを必ず渡す
@@ -35,6 +36,7 @@ export component AppWindow inherits Window {
     callback export-selected-image();
 
     title: "GIF IDE";
+    default-font-family: Style.font-family;
     preferred-height: 560px;
     preferred-width: 900px;
 
