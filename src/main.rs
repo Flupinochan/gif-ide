@@ -154,15 +154,6 @@ fn main() -> Result<()> {
         }
     });
 
-    // 画面最大化 (仕様が変わるかもしれないため消さないこと!!)
-    // let ui_weak = ui.as_weak();
-    // slint::invoke_from_event_loop(move || {
-    //     if let Some(ui) = ui_weak.upgrade() {
-    //         ui.window().set_maximized(true);
-    //     }
-    // })
-    // .unwrap();
-
     // GIFファイル選択Callback
     let ui_weak = ui.as_weak();
     let gif_ref_open = gif_file_ref.clone();
