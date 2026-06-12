@@ -24,7 +24,8 @@ export component AppWindow inherits Window {
     in property <string> total_duration: "00:00";
     in-out property <[FrameData]> frames: [];
     in-out property <int> selected-frame-index: 0;
-    in-out property <bool> is-play;
+    in-out property <bool> is-play: false;
+    in-out property <bool> is-repeat: true;
     in-out property <length> sidebar-width: 200px;
     in property <string> current-filename: "";
     in property <int> canvas-width: 0;
@@ -154,6 +155,18 @@ export component AppWindow inherits Window {
                                     clicked => {
                                         let next = selected-frame-index + 1;
                                         root.selected-frame-index = next >= frames.length ? 0 : next;
+                                    }
+                                }
+                            }
+
+                            VerticalLayout {
+                                alignment: center;
+                                Button {
+                                    icon: @image-url("assets/repeat.svg");
+                                    colorize-icon: true;
+                                    primary: is-repeat;
+                                    clicked => {
+                                        is-repeat = !is-repeat;
                                     }
                                 }
                             }

@@ -144,7 +144,18 @@ fn schedule_next_frame(ui_weak: slint::Weak<AppWindow>, frame_idx: usize) {
         if !ui.get_is_play() {
             return;
         }
-        let next = (frame_idx + 1) % frame_count;
+
+        if frame_idx + 1 >= frame_count {
+            if ui.get_is_repeat() {
+                ui.set_selected_frame_index(0);
+                schedule_next_frame(ui_weak, 0);
+            } else {
+                ui.set_is_play(false);
+            }
+            return;
+        }
+
+        let next = frame_idx + 1;
         ui.set_selected_frame_index(next as i32);
         schedule_next_frame(ui_weak, next);
     });
@@ -166,7 +177,14 @@ fn main() -> Result<()> {
             return;
         };
         if ui.get_is_play() {
-            schedule_next_frame(ui.as_weak(), start_index as usize);
+            let frame_count = ui.get_frames().row_count();
+            let start_index = if frame_count > 0 && start_index as usize >= frame_count - 1 {
+                ui.set_selected_frame_index(0);
+                0
+            } else {
+                start_index as usize
+            };
+            schedule_next_frame(ui.as_weak(), start_index);
         }
     });
 
