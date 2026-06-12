@@ -13,3 +13,6 @@ $RECYCLE.BIN/
 *.swo
 *~
 .DS_Store
+
+# test
+bench_output.txt
