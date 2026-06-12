@@ -7,6 +7,7 @@ import {
     ComboBox,
     Spinner,
     Palette,
+    Switch,
 } from "std-widgets.slint";
 import { SelectionGroup } from "selection-group.slint";
 import { Style } from "global-styles.slint";
@@ -20,7 +21,9 @@ export enum ExportState {
 export component ExportImageWindow inherits Window {
     in-out property <int> format-index: 0;
     in-out property <int> range-index: 0;
-    out property <bool> is-jpeg: format-index == 1;
+    out property <bool> is-gif: format-index == 0;
+    out property <bool> is-jpeg: format-index == 2;
+    in-out property <bool> is-gif-loop: true;
     in-out property <string> save-path: "";
     in-out property <float> quality: 100;
     in property <ExportState> state: ExportState.form;
@@ -93,26 +96,11 @@ export component ExportImageWindow inherits Window {
             }
 
             ComboBox {
-                model: ["PNG", "JPEG", "WEBP", "BMP", "ICO", "AVIF"];
+                model: ["GIF", "PNG", "JPEG", "WEBP", "BMP", "ICO", "AVIF"];
                 current-index <=> root.format-index;
                 selected(current-value) => {
                     root.save-path = "";
                 }
-            }
-        }
-
-        VerticalLayout {
-            spacing: 10px;
-            Text {
-                text: "範囲";
-                font-size: 14px;
-                font-weight: FontWeight.medium;
-                vertical-alignment: center;
-            }
-
-            SelectionGroup {
-                options: ["現在のフレーム", "すべて"];
-                selected-index <=> root.range-index;
             }
         }
 
@@ -138,6 +126,33 @@ export component ExportImageWindow inherits Window {
                     clicked => {
                         root.pick-path();
                     }
+                }
+            }
+        }
+
+        if !root.is-gif: VerticalLayout {
+            spacing: 10px;
+            Text {
+                text: "範囲";
+                font-size: 14px;
+                font-weight: FontWeight.medium;
+                vertical-alignment: center;
+            }
+
+            SelectionGroup {
+                options: ["現在のフレーム", "すべて"];
+                selected-index <=> root.range-index;
+            }
+        }
+
+        if root.is-gif: HorizontalLayout {
+            padding-top: 5px;
+            spacing: 10px;
+            Switch {
+                text: "ループ";
+                checked: is-gif-loop;
+                toggled => {
+                    is-gif-loop = !is-gif-loop;
                 }
             }
         }

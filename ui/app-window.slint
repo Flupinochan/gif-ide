@@ -33,7 +33,6 @@ export component AppWindow inherits Window {
     callback pick-gif();
     callback show-test-dialog();
     callback play(int);
-    callback export-gif();
     callback export-selected-image();
 
     title: "GIF IDE";
@@ -488,16 +487,7 @@ export component AppWindow inherits Window {
                         }
 
                         Button {
-                            text: "GIF出力";
-                            primary: true;
-                            enabled: frames.length > 0;
-                            clicked => {
-                                root.export-gif();
-                            }
-                        }
-
-                        Button {
-                            text: "画像出力";
+                            text: "出力";
                             primary: true;
                             enabled: frames.length > 0;
                             clicked => {

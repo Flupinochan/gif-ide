@@ -258,38 +258,10 @@ fn main() -> Result<()> {
         .unwrap();
     });
 
-    // GIF出力Callback
-    let ui_weak_export = ui.as_weak();
-    let gif_ref_export = gif_file_ref.clone();
-    ui.on_export_gif(move || {
-        let Some(ui) = ui_weak_export.upgrade() else {
-            return;
-        };
-        let gif_clone = gif_ref_export.borrow().clone();
-        let Some(gif) = gif_clone else { return };
-        let ui_weak = ui.as_weak();
-        slint::spawn_local(async move {
-            let Some(path) = save_gif_file().await else {
-                return;
-            };
-
-            let result = tokio::task::spawn_blocking(move || gif.export(&path))
-                .await
-                .unwrap();
-            if let Err(e) = result {
-                let _ = slint::invoke_from_event_loop(move || {
-                    if let Some(ui) = ui_weak.upgrade() {
-                        show_dialog("エラー", &format!("GIFの出力に失敗しました: {}", e), &ui);
-                    }
-                });
-            }
-        })
-        .unwrap();
-    });
-
-    // 画像出力ウィンドウCallback
+    // 出力ウィンドウCallback
     let ui_weak_ok = ui.as_weak();
     let export_window_weak_ok = export_window.as_weak();
+    let gif_ref_ok = gif_file_ref.clone();
     export_window.on_ok_clicked(move || {
         let (Some(export_window), Some(ui)) =
             (export_window_weak_ok.upgrade(), ui_weak_ok.upgrade())
@@ -297,74 +269,144 @@ fn main() -> Result<()> {
             return;
         };
 
-        // TODO: 「すべて」の出力は未実装
-        if export_window.get_range_index() != 0 {
-            return;
-        }
-
         let path = PathBuf::from(export_window.get_save_path().as_str());
-        let frame_index = ui.get_selected_frame_index() as usize;
-        let Some(frame) = ui.get_frames().row_data(frame_index) else {
-            return;
-        };
-        let Some(buffer) = frame.image.to_rgba8() else {
-            return;
-        };
-        let (_, _, format) = IMAGE_FORMATS[export_window.get_format_index() as usize];
-        let is_jpeg = export_window.get_is_jpeg();
-        let quality = export_window.get_quality() as u8;
-
-        // TODO: ICOは幅・高さとも1..=256の制約があるため、imageops::resizeで
-        // アスペクト比を保ったまま縮小し、ユーザーにサイズ(256/128/64/32など)を選択させる必要がある
         let export_window_weak = export_window.as_weak();
         let ui_weak = ui.as_weak();
-        slint::spawn_local(async move {
-            let result = tokio::task::spawn_blocking(move || -> image::ImageResult<()> {
-                if is_jpeg {
-                    let rgba = image::RgbaImage::from_raw(
-                        buffer.width(),
-                        buffer.height(),
-                        buffer.as_bytes().to_vec(),
-                    )
-                    .expect("invalid image buffer");
-                    let rgb = rgba_to_rgb_with_white_background(rgba);
-                    let writer = std::io::BufWriter::new(std::fs::File::create(&path)?);
-                    let mut encoder =
-                        image::codecs::jpeg::JpegEncoder::new_with_quality(writer, quality);
-                    encoder.encode(
-                        rgb.as_raw(),
-                        rgb.width(),
-                        rgb.height(),
-                        image::ExtendedColorType::Rgb8,
-                    )
-                } else {
-                    image::save_buffer_with_format(
-                        &path,
-                        buffer.as_bytes(),
-                        buffer.width(),
-                        buffer.height(),
-                        image::ColorType::Rgba8,
-                        format,
-                    )
-                }
-            })
-            .await
-            .unwrap();
 
-            let _ = slint::invoke_from_event_loop(move || match result {
-                Ok(()) => {
-                    if let Some(export_window) = export_window_weak.upgrade() {
-                        export_window.set_state(ExportState::Success);
-                    }
-                }
-                Err(e) => {
-                    if let Some(ui) = ui_weak.upgrade() {
-                        show_dialog("エラー", &format!("画像の出力に失敗しました: {}", e), &ui);
-                    }
-                }
-            });
-        })
-        .unwrap();
+        enum ExportJob {
+            Gif {
+                gif: GifFile,
+                loop_forever: bool,
+            },
+            Image {
+                buffer: slint::SharedPixelBuffer<slint::Rgba8Pixel>,
+                format: image::ImageFormat,
+                is_jpeg: bool,
+                quality: u8,
+            },
+        }
+
+        let job = if export_window.get_is_gif() {
+            let Some(gif) = gif_ref_ok.borrow().clone() else {
+                return;
+            };
+            ExportJob::Gif {
+                gif,
+                loop_forever: export_window.get_is_gif_loop(),
+            }
+        } else {
+            // TODO: 「すべて」の出力は未実装
+            if export_window.get_range_index() != 0 {
+                return;
+            }
+
+            let frame_index = ui.get_selected_frame_index() as usize;
+            let Some(frame) = ui.get_frames().row_data(frame_index) else {
+                return;
+            };
+            let Some(buffer) = frame.image.to_rgba8() else {
+                return;
+            };
+            let (_, _, format) = IMAGE_FORMATS[export_window.get_format_index() as usize - 1];
+
+            // TODO: ICOは幅・高さとも1..=256の制約があるため、imageops::resizeで
+            // アスペクト比を保ったまま縮小し、ユーザーにサイズ(256/128/64/32など)を選択させる必要がある
+            ExportJob::Image {
+                buffer,
+                format,
+                is_jpeg: export_window.get_is_jpeg(),
+                quality: export_window.get_quality() as u8,
+            }
+        };
+
+        export_window.set_state(ExportState::Processing);
+
+        match job {
+            ExportJob::Gif { gif, loop_forever } => {
+                slint::spawn_local(async move {
+                    let result =
+                        tokio::task::spawn_blocking(move || gif.export(&path, loop_forever))
+                            .await
+                            .unwrap();
+
+                    let _ = slint::invoke_from_event_loop(move || match result {
+                        Ok(()) => {
+                            if let Some(export_window) = export_window_weak.upgrade() {
+                                export_window.set_state(ExportState::Success);
+                            }
+                        }
+                        Err(e) => {
+                            if let Some(ui) = ui_weak.upgrade() {
+                                show_dialog(
+                                    "エラー",
+                                    &format!("GIFの出力に失敗しました: {}", e),
+                                    &ui,
+                                );
+                            }
+                        }
+                    });
+                })
+                .unwrap();
+            }
+            ExportJob::Image {
+                buffer,
+                format,
+                is_jpeg,
+                quality,
+            } => {
+                slint::spawn_local(async move {
+                    let result = tokio::task::spawn_blocking(move || -> image::ImageResult<()> {
+                        if is_jpeg {
+                            let rgba = image::RgbaImage::from_raw(
+                                buffer.width(),
+                                buffer.height(),
+                                buffer.as_bytes().to_vec(),
+                            )
+                            .expect("invalid image buffer");
+                            let rgb = rgba_to_rgb_with_white_background(rgba);
+                            let writer = std::io::BufWriter::new(std::fs::File::create(&path)?);
+                            let mut encoder =
+                                image::codecs::jpeg::JpegEncoder::new_with_quality(writer, quality);
+                            encoder.encode(
+                                rgb.as_raw(),
+                                rgb.width(),
+                                rgb.height(),
+                                image::ExtendedColorType::Rgb8,
+                            )
+                        } else {
+                            image::save_buffer_with_format(
+                                &path,
+                                buffer.as_bytes(),
+                                buffer.width(),
+                                buffer.height(),
+                                image::ColorType::Rgba8,
+                                format,
+                            )
+                        }
+                    })
+                    .await
+                    .unwrap();
+
+                    let _ = slint::invoke_from_event_loop(move || match result {
+                        Ok(()) => {
+                            if let Some(export_window) = export_window_weak.upgrade() {
+                                export_window.set_state(ExportState::Success);
+                            }
+                        }
+                        Err(e) => {
+                            if let Some(ui) = ui_weak.upgrade() {
+                                show_dialog(
+                                    "エラー",
+                                    &format!("画像の出力に失敗しました: {}", e),
+                                    &ui,
+                                );
+                            }
+                        }
+                    });
+                })
+                .unwrap();
+            }
+        }
     });
 
     let export_window_weak_cancel = export_window.as_weak();
@@ -390,9 +432,14 @@ fn main() -> Result<()> {
         };
 
         let format_index = export_window.get_format_index();
+        let is_gif = export_window.get_is_gif();
         let export_window_weak = export_window.as_weak();
         slint::spawn_local(async move {
-            let path = save_image_file(format_index).await;
+            let path = if is_gif {
+                save_gif_file().await
+            } else {
+                save_image_file(format_index - 1).await
+            };
 
             let _ = slint::invoke_from_event_loop(move || {
                 let Some(export_window) = export_window_weak.upgrade() else {

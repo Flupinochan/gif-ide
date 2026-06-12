@@ -54,13 +54,17 @@ impl GifFile {
     }
 
     // UIでカスタム設定として実装予定の箇所をTODOとして記載
-    pub fn export(&self, path: &Path) -> Result<()> {
+    pub fn export(&self, path: &Path, loop_forever: bool) -> Result<()> {
         let w = self.canvas_width;
         let h = self.canvas_height;
         let file = BufWriter::new(File::create(path)?);
         let mut encoder = gif::Encoder::new(file, w, h, &[])?;
-        // TODO: 無限ループ
-        encoder.set_repeat(gif::Repeat::Infinite)?;
+        let repeat = if loop_forever {
+            gif::Repeat::Infinite
+        } else {
+            gif::Repeat::Finite(0)
+        };
+        encoder.set_repeat(repeat)?;
 
         // TODO: Canvasサイズ
         let mut canvas = vec![0u8; w as usize * h as usize * 4];
