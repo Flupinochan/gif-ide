@@ -88,7 +88,7 @@ export component AppWindow inherits Window {
                     padding: 12px;
 
                     if !is-loading && frames.length == 0: Button {
-                        text: "Pick GIF";
+                        text: "ファイル選択";
                         clicked => root.pick-gif();
                     }
 
@@ -233,7 +233,7 @@ export component AppWindow inherits Window {
                         }
                     }
 
-                    VerticalLayout {
+                    if frames.length != 0: VerticalLayout {
                         HorizontalLayout {
                             alignment: start;
                             spacing: 8px;
@@ -242,7 +242,7 @@ export component AppWindow inherits Window {
                                 horizontal-alignment: center;
                                 text: 0;
                                 input-type: number;
-                                enabled: !is-play && frames.length != 0;
+                                enabled: !is-play;
                                 edited(text) => {
                                     if (text.is-float()) {
                                         self.text = Math.clamp(text.to-float(), 0, 6000);
@@ -258,7 +258,7 @@ export component AppWindow inherits Window {
 
                             apply-delay := Button {
                                 text: "delay一括適用";
-                                enabled: !is-play && frames.length != 0;
+                                enabled: !is-play;
                                 clicked => {
                                     bulk-delay-input.clear-focus();
                                     root.apply-delay-to-all(bulk-delay-input.text.to-float());
@@ -536,16 +536,24 @@ export component AppWindow inherits Window {
 
                             // 小見出し
                             Text {
-                                text: "出力";
+                                text: "入力/出力";
                                 font-size: 13px;
                                 font-weight: FontWeight.medium;
                                 color: Palette.foreground.transparentize(0.3);
                             }
 
                             Button {
+                                text: "ファイル選択";
+                                enabled: !is-play;
+                                clicked => {
+                                    root.pick-gif();
+                                }
+                            }
+
+                            Button {
                                 text: "出力";
                                 primary: true;
-                                enabled: frames.length > 0;
+                                enabled: !is-play && frames.length > 0;
                                 clicked => {
                                     root.export-selected-image();
                                 }
