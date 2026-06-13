@@ -1,10 +1,11 @@
 import {
     Button,
-    VerticalBox,
     Spinner,
     Palette,
     Slider,
     ScrollView,
+    AboutSlint,
+    LineEdit,
 } from "std-widgets.slint";
 import { Style } from "global-styles.slint";
 export { MessageDialog } from "message-dialog.slint";
@@ -84,7 +85,7 @@ export component AppWindow inherits Window {
                 // Image Display
                 VerticalLayout {
                     vertical-stretch: 1;
-                    padding-bottom: 12px;
+                    padding: 12px;
 
                     if !is-loading && frames.length == 0: Button {
                         text: "Pick GIF";
@@ -231,16 +232,6 @@ export component AppWindow inherits Window {
                         }
                     }
 
-                    HorizontalLayout {
-                        padding-bottom: 8px;
-                        alignment: end;
-                        Text {
-                            font-size: 12px;
-                            color: Palette.foreground.transparentize(0.4);
-                            text: gif-frame-count + " frames";
-                        }
-                    }
-
                     frame-scroll := ScrollView {
                         viewport-width: frame-list.preferred-width;
                         height: frame-list.preferred-height;
@@ -249,67 +240,96 @@ export component AppWindow inherits Window {
                             alignment: start;
                             spacing: 8px;
                             padding-bottom: 22px;
-                            for frame[i] in frames: TouchArea {
+                            for frame[i] in frames: VerticalLayout {
                                 property <bool> is-dragging: false;
 
-                                // フリックスクロール動作
-                                mouse-cursor: self.pressed ? MouseCursor.grabbing : MouseCursor.grab;
-                                pointer-event(e) => {
-                                    if (e.kind == PointerEventKind.down) {
-                                        is-dragging = false;
-                                        fling-velocity = 0px;
-                                        inertia-timer.running = false;
-                                    }
-                                    if (e.kind == PointerEventKind.up && is-dragging) {
-                                        if (abs(fling-velocity) > 1px) {
-                                            inertia-timer.running = true;
+                                frame-touch-area := TouchArea {
+                                    // フリックスクロール動作
+                                    mouse-cursor: self.pressed ? MouseCursor.grabbing : MouseCursor.grab;
+                                    pointer-event(e) => {
+                                        if (e.kind == PointerEventKind.down) {
+                                            is-dragging = false;
+                                            fling-velocity = 0px;
+                                            inertia-timer.running = false;
+                                        }
+                                        if (e.kind == PointerEventKind.up && is-dragging) {
+                                            if (abs(fling-velocity) > 1px) {
+                                                inertia-timer.running = true;
+                                            }
                                         }
                                     }
-                                }
-                                moved => {
-                                    let dx = self.mouse-x - self.pressed-x;
-                                    if (abs(dx) > 4px || is-dragging) {
-                                        is-dragging = true;
-                                        let prev-x = frame-scroll.viewport-x;
-                                        let max-scroll = frame-list.preferred-width - frame-scroll.visible-width;
-                                        frame-scroll.viewport-x = clamp(frame-scroll.viewport-x + dx, -max-scroll, 0px);
-                                        fling-velocity = frame-scroll.viewport-x - prev-x;
+                                    moved => {
+                                        let dx = self.mouse-x - self.pressed-x;
+                                        if (abs(dx) > 4px || is-dragging) {
+                                            is-dragging = true;
+                                            let prev-x = frame-scroll.viewport-x;
+                                            let max-scroll = frame-list.preferred-width - frame-scroll.visible-width;
+                                            frame-scroll.viewport-x = clamp(frame-scroll.viewport-x + dx, -max-scroll, 0px);
+                                            fling-velocity = frame-scroll.viewport-x - prev-x;
+                                        }
                                     }
-                                }
-                                clicked => {
-                                    if (!is-dragging) {
-                                        root.selected-frame-index = i;
-                                    }
-                                }
-                                width: 64px;
-                                height: 50px;
-
-                                Rectangle {
-                                    border-width: 1px;
-                                    border-color: root.selected-frame-index == i ? Palette.accent-background : parent.has-hover ? Palette.accent-background.transparentize(0.5) : Palette.foreground.transparentize(0.7);
-                                    border-radius: 4px;
-                                    clip: true;
-
-                                    Image {
-                                        width: parent.width;
-                                        height: parent.height;
-                                        source: frame.image;
-                                        image-fit: cover;
+                                    clicked => {
+                                        if (!is-dragging) {
+                                            root.selected-frame-index = i;
+                                        }
                                     }
 
-                                    Rectangle {
-                                        x: 4px;
-                                        y: parent.height - self.height - 4px;
-                                        width: num.preferred-width + 6px;
-                                        height: num.preferred-height + 2px;
-                                        border-radius: 2px;
-                                        background: Palette.background.transparentize(0.3);
+                                    VerticalLayout {
+                                        width: 64px;
+                                        spacing: 10px;
 
-                                        num := Text {
-                                            x: 3px;
-                                            font-size: 10px;
-                                            color: Palette.foreground;
-                                            text: i + 1;
+                                        Rectangle {
+                                            height: 50px;
+                                            border-width: 1px;
+                                            border-color: root.selected-frame-index == i ? Palette.accent-background : frame-touch-area.has-hover ? Palette.accent-background.transparentize(0.5) : Palette.foreground.transparentize(0.7);
+                                            border-radius: 4px;
+                                            clip: true;
+
+                                            Image {
+                                                width: parent.width;
+                                                height: parent.height;
+                                                source: frame.image;
+                                                image-fit: cover;
+                                            }
+
+                                            Rectangle {
+                                                x: 4px;
+                                                y: parent.height - self.height - 4px;
+                                                width: num.preferred-width + 6px;
+                                                height: num.preferred-height + 2px;
+                                                border-radius: 2px;
+                                                background: Palette.background.transparentize(0.3);
+
+                                                num := Text {
+                                                    x: 3px;
+                                                    font-size: 10px;
+                                                    color: Palette.foreground;
+                                                    text: i + 1;
+                                                }
+                                            }
+                                        }
+
+                                        VerticalLayout {
+                                            alignment: center;
+                                            LineEdit {
+                                                height: 20px;
+                                                width: 64px;
+                                                horizontal-alignment: center;
+                                                text: frame.delay;
+                                                input-type: number;
+                                                enabled: !is-play;
+                                                edited(text) => {
+                                                    if (text.is-float()) {
+                                                        self.text = Math.clamp(text.to-float(), 0, 6000);
+                                                    } else {
+                                                        self.text = 0;
+                                                    }
+                                                    root.frames[i].delay = self.text.to-float();
+                                                }
+                                                accepted(text) => {
+                                                    self.clear-focus();
+                                                }
+                                            }
                                         }
                                     }
                                 }
@@ -393,112 +413,121 @@ export component AppWindow inherits Window {
                 }
 
                 if current-tab == 0: VerticalLayout {
-                    alignment: start;
+                    alignment: space-between;
 
+                    VerticalLayout {
                     // File Info
+                        VerticalLayout {
+                            padding: 12px;
+                            spacing: 4px;
+                            alignment: center;
+
+                            // 小見出し
+                            Text {
+                                text: "GIF 情報";
+                                font-size: 13px;
+                                font-weight: FontWeight.medium;
+                                color: Palette.foreground.transparentize(0.3);
+                            }
+
+                            // ファイル名
+                            HorizontalLayout {
+                                alignment: space-between;
+
+                                Text {
+                                    text: "ファイル名";
+                                    font-size: 12px;
+                                    color: Palette.foreground.transparentize(0.5);
+                                    vertical-alignment: center;
+                                }
+
+                                Text {
+                                    text: current-filename == "" ? "---" : current-filename;
+                                    font-size: 12px;
+                                    color: Palette.foreground.transparentize(0.5);
+                                    vertical-alignment: center;
+                                }
+                            }
+
+                            // 総フレーム数
+                            HorizontalLayout {
+                                alignment: space-between;
+
+                                Text {
+                                    text: "総フレーム数";
+                                    font-size: 12px;
+                                    color: Palette.foreground.transparentize(0.5);
+                                    vertical-alignment: center;
+                                }
+
+                                Text {
+                                    text: gif-frame-count == 0 ? "---" : gif-frame-count;
+                                    font-size: 12px;
+                                    color: Palette.foreground.transparentize(0.5);
+                                    vertical-alignment: center;
+                                }
+                            }
+
+                            // GIF Canvasサイズ
+                            HorizontalLayout {
+                                alignment: space-between;
+
+                                Text {
+                                    text: "サイズ";
+                                    font-size: 12px;
+                                    color: Palette.foreground.transparentize(0.5);
+                                    vertical-alignment: center;
+                                }
+
+                                Text {
+                                    text: canvas-width == 0 ? "---" : canvas-width + " x " + canvas-height;
+                                    font-size: 12px;
+                                    color: Palette.foreground.transparentize(0.5);
+                                    vertical-alignment: center;
+                                }
+                            }
+                        }
+
+                        Rectangle {
+                            height: 1px;
+                            background: Palette.foreground.transparentize(0.7);
+                        }
+
+                        // Export
+                        VerticalLayout {
+                            padding: 12px;
+                            spacing: 8px;
+                            alignment: center;
+
+                            // 小見出し
+                            Text {
+                                text: "出力";
+                                font-size: 13px;
+                                font-weight: FontWeight.medium;
+                                color: Palette.foreground.transparentize(0.3);
+                            }
+
+                            Button {
+                                text: "出力";
+                                primary: true;
+                                enabled: frames.length > 0;
+                                clicked => {
+                                    root.export-selected-image();
+                                }
+                            }
+                        }
+
+                        Rectangle {
+                            height: 1px;
+                            background: Palette.foreground.transparentize(0.7);
+                        }
+                    }
+
                     VerticalLayout {
-                        padding: 12px;
-                        spacing: 4px;
-                        alignment: center;
-
-                        // 小見出し
-                        Text {
-                            text: "GIF 情報";
-                            font-size: 13px;
-                            font-weight: FontWeight.medium;
-                            color: Palette.foreground.transparentize(0.3);
+                        padding-bottom: 10px;
+                        AboutSlint {
+                            height: 100px;
                         }
-
-                        // ファイル名
-                        HorizontalLayout {
-                            alignment: space-between;
-
-                            Text {
-                                text: "ファイル名";
-                                font-size: 12px;
-                                color: Palette.foreground.transparentize(0.5);
-                                vertical-alignment: center;
-                            }
-
-                            Text {
-                                text: current-filename == "" ? "---" : current-filename;
-                                font-size: 12px;
-                                color: Palette.foreground.transparentize(0.5);
-                                vertical-alignment: center;
-                            }
-                        }
-
-                        // 総フレーム数
-                        HorizontalLayout {
-                            alignment: space-between;
-
-                            Text {
-                                text: "総フレーム数";
-                                font-size: 12px;
-                                color: Palette.foreground.transparentize(0.5);
-                                vertical-alignment: center;
-                            }
-
-                            Text {
-                                text: gif-frame-count == 0 ? "---" : gif-frame-count;
-                                font-size: 12px;
-                                color: Palette.foreground.transparentize(0.5);
-                                vertical-alignment: center;
-                            }
-                        }
-
-                        // GIF Canvasサイズ
-                        HorizontalLayout {
-                            alignment: space-between;
-
-                            Text {
-                                text: "サイズ";
-                                font-size: 12px;
-                                color: Palette.foreground.transparentize(0.5);
-                                vertical-alignment: center;
-                            }
-
-                            Text {
-                                text: canvas-width == 0 ? "---" : canvas-width + " x " + canvas-height;
-                                font-size: 12px;
-                                color: Palette.foreground.transparentize(0.5);
-                                vertical-alignment: center;
-                            }
-                        }
-                    }
-
-                    Rectangle {
-                        height: 1px;
-                        background: Palette.foreground.transparentize(0.7);
-                    }
-
-                    // Export
-                    VerticalLayout {
-                        padding: 12px;
-                        spacing: 8px;
-                        alignment: center;
-
-                        // 小見出し
-                        Text {
-                            text: "出力";
-                            font-size: 13px;
-                            font-weight: FontWeight.medium;
-                            color: Palette.foreground.transparentize(0.3);
-                        }
-
-                        Button {
-                            text: "出力";
-                            primary: true;
-                            enabled: frames.length > 0;
-                            clicked => {
-                                root.export-selected-image();
-                            }
-                        }
-                    }
-
-                    Rectangle {
-                        height: 1px;
-                        background: Palette.foreground.transparentize(0.7);
                     }
                 }
 

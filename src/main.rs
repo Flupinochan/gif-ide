@@ -347,6 +347,7 @@ fn main() -> Result<()> {
             Gif {
                 gif: GifFile,
                 loop_forever: bool,
+                delays: Vec<u16>,
             },
             Image {
                 buffers: Vec<slint::SharedPixelBuffer<slint::Rgba8Pixel>>,
@@ -360,9 +361,15 @@ fn main() -> Result<()> {
             let Some(gif) = gif_ref_ok.borrow().clone() else {
                 return;
             };
+            let frames = ui.get_frames();
+            let delays: Vec<u16> = (0..frames.row_count())
+                .filter_map(|i| frames.row_data(i))
+                .map(|f| f.delay.clamp(0, u16::MAX as i32) as u16)
+                .collect();
             ExportJob::Gif {
                 gif,
                 loop_forever: export_window.get_is_gif_loop(),
+                delays,
             }
         } else {
             let frames = ui.get_frames();
@@ -396,12 +403,17 @@ fn main() -> Result<()> {
         export_window.set_state(ExportState::Processing);
 
         match job {
-            ExportJob::Gif { gif, loop_forever } => {
+            ExportJob::Gif {
+                gif,
+                loop_forever,
+                delays,
+            } => {
                 slint::spawn_local(async move {
-                    let result =
-                        tokio::task::spawn_blocking(move || gif.export(&path, loop_forever))
-                            .await
-                            .unwrap();
+                    let result = tokio::task::spawn_blocking(move || {
+                        gif.export(&path, loop_forever, &delays)
+                    })
+                    .await
+                    .unwrap();
 
                     let _ = slint::invoke_from_event_loop(move || match result {
                         Ok(()) => {

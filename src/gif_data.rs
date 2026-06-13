@@ -54,7 +54,7 @@ impl GifFile {
     }
 
     // UIでカスタム設定として実装予定の箇所をTODOとして記載
-    pub fn export(&self, path: &Path, loop_forever: bool) -> Result<()> {
+    pub fn export(&self, path: &Path, loop_forever: bool, delays: &[u16]) -> Result<()> {
         let w = self.canvas_width;
         let h = self.canvas_height;
         let file = BufWriter::new(File::create(path)?);
@@ -69,7 +69,7 @@ impl GifFile {
         // TODO: Canvasサイズ
         let mut canvas = vec![0u8; w as usize * h as usize * 4];
 
-        for frame in &self.frames {
+        for (frame, &delay) in self.frames.iter().zip(delays) {
             let prev_canvas = if frame.dispose == gif::DisposalMethod::Previous {
                 Some(canvas.clone())
             } else {
@@ -90,7 +90,7 @@ impl GifFile {
 
             let mut pixels = canvas.clone();
             let mut gif_frame = gif::Frame::from_rgba_speed(w, h, &mut pixels, 10);
-            gif_frame.delay = frame.delay;
+            gif_frame.delay = delay;
             gif_frame.dispose = gif::DisposalMethod::Background;
             encoder.write_frame(&gif_frame)?;
 
