@@ -258,6 +258,21 @@ fn main() -> Result<()> {
         }
     });
 
+    // delay一括適用Callback
+    let ui_weak_for_bulk_delay = ui.as_weak();
+    ui.on_apply_delay_to_all(move |delay| {
+        let Some(ui) = ui_weak_for_bulk_delay.upgrade() else {
+            return;
+        };
+        let frames = ui.get_frames();
+        for i in 0..frames.row_count() {
+            if let Some(mut frame) = frames.row_data(i) {
+                frame.delay = delay;
+                frames.set_row_data(i, frame);
+            }
+        }
+    });
+
     // GIFファイル選択Callback
     let ui_weak = ui.as_weak();
     let gif_ref_open = gif_file_ref.clone();

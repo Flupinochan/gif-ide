@@ -19,7 +19,6 @@ struct FrameData {
 }
 
 export component AppWindow inherits Window {
-    in property <int> gif-frame-count: frames.length;
     in property <bool> is-loading: false;
     in-out property <int> current-tab: 0;
     in property <string> total_duration: "00:00";
@@ -35,6 +34,7 @@ export component AppWindow inherits Window {
     callback show-test-dialog();
     callback play(int);
     callback export-selected-image();
+    callback apply-delay-to-all(int);
 
     title: "GIF IDE";
     default-font-family: Style.font-family;
@@ -217,6 +217,7 @@ export component AppWindow inherits Window {
                     alignment: center;
                     vertical-stretch: 0;
                     padding: 12px;
+                    spacing: 10px;
 
                     property <length> fling-velocity: 0px;
 
@@ -228,6 +229,40 @@ export component AppWindow inherits Window {
                             fling-velocity = fling-velocity * 0.92;
                             if (abs(fling-velocity) < 0.5px) {
                                 self.running = false;
+                            }
+                        }
+                    }
+
+                    VerticalLayout {
+                        HorizontalLayout {
+                            alignment: start;
+                            spacing: 8px;
+                            bulk-delay-input := LineEdit {
+                                width: 64px;
+                                horizontal-alignment: center;
+                                text: 0;
+                                input-type: number;
+                                enabled: !is-play && frames.length != 0;
+                                edited(text) => {
+                                    if (text.is-float()) {
+                                        self.text = Math.clamp(text.to-float(), 0, 6000);
+                                    } else {
+                                        self.text = 0;
+                                    }
+                                }
+                                accepted(text) => {
+                                    self.clear-focus();
+                                    apply-delay.clicked();
+                                }
+                            }
+
+                            apply-delay := Button {
+                                text: "delay一括適用";
+                                enabled: !is-play && frames.length != 0;
+                                clicked => {
+                                    bulk-delay-input.clear-focus();
+                                    root.apply-delay-to-all(bulk-delay-input.text.to-float());
+                                }
                             }
                         }
                     }
@@ -461,7 +496,7 @@ export component AppWindow inherits Window {
                                 }
 
                                 Text {
-                                    text: gif-frame-count == 0 ? "---" : gif-frame-count;
+                                    text: frames.length == 0 ? "---" : frames.length;
                                     font-size: 12px;
                                     color: Palette.foreground.transparentize(0.5);
                                     vertical-alignment: center;
