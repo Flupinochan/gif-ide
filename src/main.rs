@@ -22,7 +22,7 @@ fn show_dialog(title: &str, message: &str, parent: &AppWindow) {
     dialog.set_title_text(SharedString::from(title));
     dialog.set_message(SharedString::from(message));
     let dialog_weak = dialog.as_weak();
-    dialog.on_ok_clicked(move || {
+    dialog.on_close(move || {
         if let Some(d) = dialog_weak.upgrade() {
             d.hide().unwrap();
         }
@@ -37,7 +37,7 @@ fn show_dialog(title: &str, message: &str, parent: &AppWindow) {
     dialog.show().unwrap();
 }
 
-async fn pick_gif_file() -> Option<PathBuf> {
+async fn import_file() -> Option<PathBuf> {
     AsyncFileDialog::new()
         .add_filter("GIF", &["gif"])
         .set_title("GIFを選択してください")
@@ -55,7 +55,7 @@ async fn save_gif_file() -> Option<PathBuf> {
         .map(|handle| handle.path().to_path_buf())
 }
 
-// ExportImageWindowのformat-indexと対応 (表示名, 拡張子, image::ImageFormat)
+// ExportFileWindowのformat-indexと対応 (表示名, 拡張子, image::ImageFormat)
 const IMAGE_FORMATS: [(&str, &str, image::ImageFormat); 6] = [
     ("PNG", "png", image::ImageFormat::Png),
     ("JPEG", "jpeg", image::ImageFormat::Jpeg),
@@ -236,7 +236,7 @@ fn main() -> Result<()> {
     let _guard = rt.enter();
 
     let ui = AppWindow::new()?;
-    let export_window = ExportImageWindow::new()?;
+    let export_window = ExportFileWindow::new()?;
 
     let gif_file_ref: Rc<RefCell<Option<GifFile>>> = Rc::new(RefCell::new(None));
 
@@ -276,12 +276,12 @@ fn main() -> Result<()> {
     // GIFファイル選択Callback
     let ui_weak = ui.as_weak();
     let gif_ref_open = gif_file_ref.clone();
-    ui.on_pick_gif(move || {
+    ui.on_import_file(move || {
         let Some(ui) = ui_weak.upgrade() else { return };
         let ui_weak = ui.as_weak();
         let gif_ref = gif_ref_open.clone();
         slint::spawn_local(async move {
-            let Some(path_buf) = pick_gif_file().await else {
+            let Some(path_buf) = import_file().await else {
                 return;
             };
             let filename = path_buf
@@ -327,9 +327,9 @@ fn main() -> Result<()> {
                     // フレームタイムライン更新
                     ui.set_frames(ModelRc::from(frames_model));
                     ui.set_selected_frame_index(0);
-                    ui.set_current_filename(SharedString::from(filename));
-                    ui.set_canvas_width(gif_file.canvas_width as i32);
-                    ui.set_canvas_height(gif_file.canvas_height as i32);
+                    ui.set_filename(SharedString::from(filename));
+                    ui.set_gif_canvas_width(gif_file.canvas_width as i32);
+                    ui.set_gif_canvas_height(gif_file.canvas_height as i32);
                 }
                 Err(e) => {
                     show_dialog(
@@ -347,14 +347,14 @@ fn main() -> Result<()> {
     let ui_weak_ok = ui.as_weak();
     let export_window_weak_ok = export_window.as_weak();
     let gif_ref_ok = gif_file_ref.clone();
-    export_window.on_ok_clicked(move || {
+    export_window.on_start_export(move || {
         let (Some(export_window), Some(ui)) =
             (export_window_weak_ok.upgrade(), ui_weak_ok.upgrade())
         else {
             return;
         };
 
-        let path = PathBuf::from(export_window.get_save_path().as_str());
+        let path = PathBuf::from(export_window.get_export_path().as_str());
         let export_window_weak = export_window.as_weak();
         let ui_weak = ui.as_weak();
 
@@ -383,7 +383,7 @@ fn main() -> Result<()> {
                 .collect();
             ExportJob::Gif {
                 gif,
-                loop_forever: export_window.get_is_gif_loop(),
+                loop_forever: export_window.get_gif_loop_forever(),
                 delays,
             }
         } else {
@@ -519,23 +519,23 @@ fn main() -> Result<()> {
     });
 
     let export_window_weak_cancel = export_window.as_weak();
-    export_window.on_cancel_clicked(move || {
+    export_window.on_cancel(move || {
         if let Some(d) = export_window_weak_cancel.upgrade() {
             d.hide().unwrap();
         }
     });
 
     let export_window_weak_open = export_window.as_weak();
-    export_window.on_open_clicked(move || {
+    export_window.on_open_export_folder(move || {
         let Some(export_window) = export_window_weak_open.upgrade() else {
             return;
         };
-        let path = PathBuf::from(export_window.get_save_path().as_str());
+        let path = PathBuf::from(export_window.get_export_path().as_str());
         open_in_explorer(&path);
     });
 
     let export_window_weak_pick = export_window.as_weak();
-    export_window.on_pick_path(move || {
+    export_window.on_select_export_path(move || {
         let Some(export_window) = export_window_weak_pick.upgrade() else {
             return;
         };
@@ -556,7 +556,7 @@ fn main() -> Result<()> {
                 };
                 if let Some(path) = path {
                     export_window
-                        .set_save_path(SharedString::from(path.to_string_lossy().into_owned()));
+                        .set_export_path(SharedString::from(path.to_string_lossy().into_owned()));
                 }
             });
         })
@@ -566,7 +566,7 @@ fn main() -> Result<()> {
     // 画像出力Callback
     let ui_weak_image = ui.as_weak();
     let export_window_weak_show = export_window.as_weak();
-    ui.on_export_selected_image(move || {
+    ui.on_export_file(move || {
         let (Some(ui), Some(export_window)) =
             (ui_weak_image.upgrade(), export_window_weak_show.upgrade())
         else {

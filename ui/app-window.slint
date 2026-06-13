@@ -9,7 +9,7 @@ import {
 } from "std-widgets.slint";
 import { Style } from "global-styles.slint";
 export { MessageDialog } from "message-dialog.slint";
-export { ExportImageWindow } from "export-image-window.slint";
+export { ExportFileWindow } from "export-file-window.slint";
 // ThemeはWindowごとに保有されるため、ExportしてDialogを開く際にThemeを必ず渡す
 export { Palette } from "std-widgets.slint";
 
@@ -19,21 +19,20 @@ struct FrameData {
 }
 
 export component AppWindow inherits Window {
-    in property <bool> is-loading: false;
     in-out property <int> current-tab: 0;
-    in property <string> total_duration: "00:00";
     in-out property <[FrameData]> frames: [];
     in-out property <int> selected-frame-index: 0;
+    in property <bool> is-loading: false;
     in-out property <bool> is-play: false;
     in-out property <bool> is-repeat: true;
+    in property <string> total-duration: "00:00";
+    in property <string> filename: "";
+    in property <int> gif-canvas-width: 0;
+    in property <int> gif-canvas-height: 0;
     in-out property <length> sidebar-width: 200px;
-    in property <string> current-filename: "";
-    in property <int> canvas-width: 0;
-    in property <int> canvas-height: 0;
-    callback pick-gif();
-    callback show-test-dialog();
+    callback import-file();
+    callback export-file();
     callback play(int);
-    callback export-selected-image();
     callback apply-delay-to-all(int);
 
     title: "GIF IDE";
@@ -89,7 +88,7 @@ export component AppWindow inherits Window {
 
                     if !is-loading && frames.length == 0: Button {
                         text: "ファイル選択";
-                        clicked => root.pick-gif();
+                        clicked => root.import-file();
                     }
 
                     if is-loading: Spinner {
@@ -199,7 +198,7 @@ export component AppWindow inherits Window {
                             VerticalLayout {
                                 alignment: center;
                                 Text {
-                                    text: total_duration;
+                                    text: total-duration;
                                     font-size: 14px;
                                 }
                             }
@@ -477,7 +476,7 @@ export component AppWindow inherits Window {
                                 }
 
                                 Text {
-                                    text: current-filename == "" ? "---" : current-filename;
+                                    text: filename == "" ? "---" : filename;
                                     font-size: 12px;
                                     color: Palette.foreground.transparentize(0.5);
                                     vertical-alignment: center;
@@ -515,7 +514,7 @@ export component AppWindow inherits Window {
                                 }
 
                                 Text {
-                                    text: canvas-width == 0 ? "---" : canvas-width + " x " + canvas-height;
+                                    text: gif-canvas-width == 0 ? "---" : gif-canvas-width + " x " + gif-canvas-height;
                                     font-size: 12px;
                                     color: Palette.foreground.transparentize(0.5);
                                     vertical-alignment: center;
@@ -546,7 +545,7 @@ export component AppWindow inherits Window {
                                 text: "ファイル選択";
                                 enabled: !is-play;
                                 clicked => {
-                                    root.pick-gif();
+                                    root.import-file();
                                 }
                             }
 
@@ -555,7 +554,7 @@ export component AppWindow inherits Window {
                                 primary: true;
                                 enabled: !is-play && frames.length > 0;
                                 clicked => {
-                                    root.export-selected-image();
+                                    root.export-file();
                                 }
                             }
                         }

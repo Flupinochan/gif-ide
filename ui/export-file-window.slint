@@ -18,23 +18,23 @@ export enum ExportState {
     success,
 }
 
-export component ExportImageWindow inherits Window {
+export component ExportFileWindow inherits Window {
     in-out property <int> format-index: 0;
-    in-out property <int> range-index: 0;
+    in-out property <string> export-path: "";
     out property <bool> is-gif: format-index == 0;
     out property <bool> is-jpeg: format-index == 2;
-    in-out property <bool> is-gif-loop: true;
-    in-out property <string> save-path: "";
+    in-out property <bool> gif-loop-forever: true;
+    in-out property <int> range-index: 0;
     in-out property <float> quality: 100;
     in property <ExportState> state: ExportState.form;
-    callback ok-clicked();
-    callback cancel-clicked();
-    callback pick-path();
-    callback open-clicked();
+    callback select-export-path();
+    callback start-export();
+    callback cancel();
+    callback open-export-folder();
 
     // FileDialogと干渉するため設定しないこと
     // always-on-top: true;
-    title: "画像出力";
+    title: "ファイル出力";
     default-font-family: Style.font-family;
     height: self.preferred-height;
 
@@ -74,7 +74,7 @@ export component ExportImageWindow inherits Window {
                     height: open-text.preferred-height;
                     mouse-cursor: pointer;
                     clicked => {
-                        root.open-clicked();
+                        root.open-export-folder();
                     }
 
                     open-text := Text {
@@ -99,7 +99,7 @@ export component ExportImageWindow inherits Window {
                 model: ["GIF", "PNG", "JPEG", "WEBP", "BMP", "ICO", "AVIF"];
                 current-index <=> root.format-index;
                 selected(current-value) => {
-                    root.save-path = "";
+                    root.export-path = "";
                 }
             }
         }
@@ -117,14 +117,14 @@ export component ExportImageWindow inherits Window {
                 spacing: 10px;
 
                 LineEdit {
-                    text <=> root.save-path;
+                    text <=> root.export-path;
                 }
 
                 Button {
                     icon: @image-url("assets/folder-open.svg");
                     colorize-icon: true;
                     clicked => {
-                        root.pick-path();
+                        root.select-export-path();
                     }
                 }
             }
@@ -150,9 +150,9 @@ export component ExportImageWindow inherits Window {
             spacing: 10px;
             Switch {
                 text: "ループ";
-                checked: is-gif-loop;
+                checked: gif-loop-forever;
                 toggled => {
-                    is-gif-loop = !is-gif-loop;
+                    gif-loop-forever = !gif-loop-forever;
                 }
             }
         }
@@ -205,9 +205,9 @@ export component ExportImageWindow inherits Window {
             if root.state == ExportState.form || root.state == ExportState.success: Button {
                 text: "OK";
                 primary: true;
-                enabled: root.save-path != "";
+                enabled: root.export-path != "";
                 clicked => {
-                    root.ok-clicked();
+                    root.start-export();
                 }
             }
 
@@ -219,7 +219,7 @@ export component ExportImageWindow inherits Window {
                 text: "Cancel";
                 enabled: root.state == ExportState.form || root.state == ExportState.success;
                 clicked => {
-                    root.cancel-clicked();
+                    root.cancel();
                 }
             }
         }

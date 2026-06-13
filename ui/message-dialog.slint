@@ -3,7 +3,7 @@ import { Style } from "global-styles.slint";
 export component MessageDialog inherits Dialog {
     in property <string> title-text;
     in property <string> message;
-    callback ok-clicked();
+    callback close();
 
     always-on-top: true;
     preferred-width: 500px;
@@ -30,7 +30,7 @@ export component MessageDialog inherits Dialog {
         kind: ok;
         primary: true;
         clicked => {
-            root.ok-clicked();
+            root.close();
         }
     }
 }
