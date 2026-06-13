@@ -14,11 +14,30 @@ use crate::gif_data::{Gif, GifFile};
 
 slint::include_modules!();
 
-fn show_dialog(title: &str, message: &str, parent: &AppWindow) {
+// window表示用macro
+// 1. theme設定
+// 2. centralize window
+// 3. focus window
+macro_rules! show_window {
+    ($window:expr, $parent:expr) => {{
+        $window
+            .global::<Palette>()
+            .set_color_scheme($parent.global::<Palette>().get_color_scheme());
+
+        let parent_pos = $parent.window().position();
+        let parent_size = $parent.window().size();
+        $window.window().set_position(slint::PhysicalPosition::new(
+            parent_pos.x + parent_size.width as i32 / 2,
+            parent_pos.y + parent_size.height as i32 / 2,
+        ));
+
+        $window.show().unwrap();
+        focus_window($window.window());
+    }};
+}
+
+fn show_message_dialog(title: &str, message: &str, parent: &AppWindow) {
     let dialog = MessageDialog::new().unwrap();
-    dialog
-        .global::<Palette>()
-        .set_color_scheme(parent.global::<Palette>().get_color_scheme());
     dialog.set_title_text(SharedString::from(title));
     dialog.set_message(SharedString::from(message));
     let dialog_weak = dialog.as_weak();
@@ -27,14 +46,7 @@ fn show_dialog(title: &str, message: &str, parent: &AppWindow) {
             d.hide().unwrap();
         }
     });
-    let parent_pos = parent.window().position();
-    let parent_size = parent.window().size();
-    let x = parent_pos.x + parent_size.width as i32 / 2;
-    let y = parent_pos.y + parent_size.height as i32 / 2;
-    dialog
-        .window()
-        .set_position(slint::PhysicalPosition::new(x, y));
-    dialog.show().unwrap();
+    show_window!(dialog, parent);
 }
 
 async fn import_file() -> Option<PathBuf> {
@@ -237,6 +249,7 @@ fn main() -> Result<()> {
 
     let ui = AppWindow::new()?;
     let export_window = ExportFileWindow::new()?;
+    let import_window = ImportFileWindow::new()?;
 
     let gif_file_ref: Rc<RefCell<Option<GifFile>>> = Rc::new(RefCell::new(None));
 
@@ -273,25 +286,78 @@ fn main() -> Result<()> {
         }
     });
 
-    // GIFファイル選択Callback
-    let ui_weak = ui.as_weak();
-    let gif_ref_open = gif_file_ref.clone();
+    // 読み込みウィンドウ表示Callback
+    let ui_weak_import = ui.as_weak();
+    let import_window_weak_show = import_window.as_weak();
     ui.on_import_file(move || {
-        let Some(ui) = ui_weak.upgrade() else { return };
-        let ui_weak = ui.as_weak();
-        let gif_ref = gif_ref_open.clone();
+        let (Some(ui), Some(import_window)) =
+            (ui_weak_import.upgrade(), import_window_weak_show.upgrade())
+        else {
+            return;
+        };
+
+        show_window!(import_window, ui);
+    });
+
+    // 読み込み元選択Callback
+    let import_window_weak_pick = import_window.as_weak();
+    import_window.on_select_import_path(move || {
+        let Some(import_window) = import_window_weak_pick.upgrade() else {
+            return;
+        };
+
+        let format_index = import_window.get_format_index();
+        let import_window_weak = import_window.as_weak();
         slint::spawn_local(async move {
-            let Some(path_buf) = import_file().await else {
-                return;
+            let path = if format_index == 0 {
+                import_file().await
+            } else {
+                // TODO: MP4インポート用のファイルピッカーを実装する (format_index == 1)
+                None
             };
-            let filename = path_buf
-                .file_name()
-                .map(|n| n.to_string_lossy().into_owned())
-                .unwrap_or_default();
 
-            let Some(ui) = ui_weak.upgrade() else { return };
-            ui.set_is_loading(true);
+            let _ = slint::invoke_from_event_loop(move || {
+                let Some(import_window) = import_window_weak.upgrade() else {
+                    return;
+                };
+                if let Some(path) = path {
+                    import_window
+                        .set_import_path(SharedString::from(path.to_string_lossy().into_owned()));
+                }
+            });
+        })
+        .unwrap();
+    });
 
+    // 読み込み実行Callback
+    let ui_weak_start = ui.as_weak();
+    let import_window_weak_start = import_window.as_weak();
+    let gif_ref_import = gif_file_ref.clone();
+    import_window.on_start_import(move || {
+        let (Some(ui), Some(import_window)) =
+            (ui_weak_start.upgrade(), import_window_weak_start.upgrade())
+        else {
+            return;
+        };
+
+        let format_index = import_window.get_format_index();
+        if format_index != 0 {
+            // TODO: MP4の読み込み処理を実装する (format_index == 1)
+            return;
+        }
+
+        let path_buf = PathBuf::from(import_window.get_import_path().as_str());
+        let filename = path_buf
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_default();
+
+        import_window.hide().unwrap();
+        ui.set_is_loading(true);
+
+        let ui_weak = ui.as_weak();
+        let gif_ref = gif_ref_import.clone();
+        slint::spawn_local(async move {
             let result = tokio::task::spawn_blocking(move || GifFile::new(&path_buf))
                 .await
                 .unwrap();
@@ -332,7 +398,7 @@ fn main() -> Result<()> {
                     ui.set_gif_canvas_height(gif_file.canvas_height as i32);
                 }
                 Err(e) => {
-                    show_dialog(
+                    show_message_dialog(
                         "エラー",
                         &format!("GIFの読み込みに失敗しました: {}", e),
                         &ui,
@@ -341,6 +407,14 @@ fn main() -> Result<()> {
             }
         })
         .unwrap();
+    });
+
+    // 読み込みウィンドウCancel Callback
+    let import_window_weak_cancel = import_window.as_weak();
+    import_window.on_cancel(move || {
+        if let Some(d) = import_window_weak_cancel.upgrade() {
+            d.hide().unwrap();
+        }
     });
 
     // 出力ウィンドウCallback
@@ -438,7 +512,7 @@ fn main() -> Result<()> {
                         }
                         Err(e) => {
                             if let Some(ui) = ui_weak.upgrade() {
-                                show_dialog(
+                                show_message_dialog(
                                     "エラー",
                                     &format!("GIFの出力に失敗しました: {}", e),
                                     &ui,
@@ -504,7 +578,7 @@ fn main() -> Result<()> {
                         }
                         Err(e) => {
                             if let Some(ui) = ui_weak.upgrade() {
-                                show_dialog(
+                                show_message_dialog(
                                     "エラー",
                                     &format!("画像の出力に失敗しました: {}", e),
                                     &ui,
@@ -573,22 +647,8 @@ fn main() -> Result<()> {
             return;
         };
 
-        export_window
-            .global::<Palette>()
-            .set_color_scheme(ui.global::<Palette>().get_color_scheme());
         export_window.set_state(ExportState::Form);
-
-        let pos = ui.window().position();
-        let size = ui.window().size();
-        export_window
-            .window()
-            .set_position(slint::PhysicalPosition::new(
-                pos.x + size.width as i32 / 2,
-                pos.y + size.height as i32 / 2,
-            ));
-
-        export_window.show().unwrap();
-        focus_window(export_window.window());
+        show_window!(export_window, ui);
     });
 
     ui.run()?;

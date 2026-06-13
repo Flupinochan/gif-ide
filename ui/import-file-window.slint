@@ -1,0 +1,85 @@
+import { Style } from "global-styles.slint";
+import { ComboBox, LineEdit, Button, Spinner } from "std-widgets.slint";
+
+export component ImportFileWindow inherits Window {
+    in-out property <int> format-index: 0;
+    in-out property <string> import-path: "";
+    callback select-import-path();
+    callback start-import();
+    callback cancel();
+
+    title: "ファイル読み込み";
+    default-font-family: Style.font-family;
+    height: self.preferred-height;
+
+    VerticalLayout {
+        padding: 16px;
+        spacing: 16px;
+
+        VerticalLayout {
+            spacing: 10px;
+            Text {
+                text: "形式";
+                font-size: 14px;
+                font-weight: FontWeight.medium;
+                vertical-alignment: center;
+            }
+
+            ComboBox {
+                model: ["GIF", "MP4"];
+                current-index <=> root.format-index;
+                selected(current-value) => {
+                    root.import-path = "";
+                }
+            }
+        }
+
+        VerticalLayout {
+            spacing: 10px;
+            Text {
+                text: "読み込み元";
+                font-size: 14px;
+                font-weight: FontWeight.medium;
+                vertical-alignment: center;
+            }
+
+            HorizontalLayout {
+                spacing: 10px;
+
+                LineEdit {
+                    text <=> root.import-path;
+                }
+
+                Button {
+                    icon: @image-url("assets/folder-open.svg");
+                    colorize-icon: true;
+                    clicked => {
+                        root.select-import-path();
+                    }
+                }
+            }
+
+            HorizontalLayout {
+                alignment: end;
+                padding-top: 10px;
+                spacing: 10px;
+
+                Button {
+                    text: "OK";
+                    primary: true;
+                    enabled: root.import-path != "";
+                    clicked => {
+                        root.start-import();
+                    }
+                }
+
+                Button {
+                    text: "Cancel";
+                    clicked => {
+                        root.cancel();
+                    }
+                }
+            }
+        }
+    }
+}
