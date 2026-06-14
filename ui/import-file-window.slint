@@ -26,7 +26,7 @@ export component ImportFileWindow inherits Window {
             }
 
             ComboBox {
-                model: ["GIF", "MP4"];
+                model: ["GIF", "Movie"];
                 current-index <=> root.format-index;
                 selected(current-value) => {
                     root.import-path = "";

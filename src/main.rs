@@ -58,6 +58,53 @@ async fn import_file() -> Option<PathBuf> {
         .map(|handle| handle.path().to_path_buf())
 }
 
+async fn import_video_file() -> Option<PathBuf> {
+    AsyncFileDialog::new()
+        .add_filter(
+            "Movie",
+            &[
+                "mp4", "m4v", "mov", "3gp", "3g2", "avi", "mkv", "webm", "wmv", "flv", "ogv",
+            ],
+        )
+        .set_title("動画を選択してください")
+        .pick_file()
+        .await
+        .map(|handle| handle.path().to_path_buf())
+}
+
+// 読み込んだGifFileの内容をUIに反映する (GIF/動画どちらの読み込みでも共通)
+fn apply_gif_file_to_ui(ui: &AppWindow, gif_file: &GifFile, filename: String) {
+    // 再生時間更新
+    let total_duration_cs: u32 = gif_file
+        .frames()
+        .iter()
+        .map(|frame| frame.delay as u32)
+        .sum();
+    let total_seconds = total_duration_cs / 100;
+    let formatted = format!("{:02}:{:02}", total_seconds / 60, total_seconds % 60);
+    ui.set_total_duration(SharedString::from(formatted));
+
+    // フレームデータ構築
+    let frame_data: Vec<FrameData> = gif_file
+        .frames()
+        .iter()
+        .enumerate()
+        .filter_map(|(i, f)| {
+            gif_file.frame_image(i).map(|img| FrameData {
+                image: img,
+                delay: (f.delay as i32).max(2),
+            })
+        })
+        .collect();
+    let frames_model = Rc::new(VecModel::from(frame_data));
+    // フレームタイムライン更新
+    ui.set_frames(ModelRc::from(frames_model));
+    ui.set_selected_frame_index(0);
+    ui.set_filename(SharedString::from(filename));
+    ui.set_gif_canvas_width(gif_file.canvas_width as i32);
+    ui.set_gif_canvas_height(gif_file.canvas_height as i32);
+}
+
 async fn save_gif_file() -> Option<PathBuf> {
     AsyncFileDialog::new()
         .add_filter("GIF", &["gif"])
@@ -312,8 +359,7 @@ fn main() -> Result<()> {
             let path = if format_index == 0 {
                 import_file().await
             } else {
-                // TODO: MP4インポート用のファイルピッカーを実装する (format_index == 1)
-                None
+                import_video_file().await
             };
 
             let _ = slint::invoke_from_event_loop(move || {
@@ -341,10 +387,6 @@ fn main() -> Result<()> {
         };
 
         let format_index = import_window.get_format_index();
-        if format_index != 0 {
-            // TODO: MP4の読み込み処理を実装する (format_index == 1)
-            return;
-        }
 
         let path_buf = PathBuf::from(import_window.get_import_path().as_str());
         let filename = path_buf
@@ -358,49 +400,28 @@ fn main() -> Result<()> {
         let ui_weak = ui.as_weak();
         let gif_ref = gif_ref_import.clone();
         slint::spawn_local(async move {
-            let result = tokio::task::spawn_blocking(move || GifFile::new(&path_buf))
-                .await
-                .unwrap();
+            let result = tokio::task::spawn_blocking(move || {
+                if format_index == 0 {
+                    GifFile::new(&path_buf)
+                } else {
+                    GifFile::from_video(&path_buf)
+                }
+            })
+            .await
+            .unwrap();
 
             let Some(ui) = ui_weak.upgrade() else { return };
             ui.set_is_loading(false);
             match result {
                 Ok(gif_file) => {
                     *gif_ref.borrow_mut() = Some(gif_file.clone());
-                    // 再生時間更新
-                    let total_duration_cs: u32 = gif_file
-                        .frames()
-                        .iter()
-                        .map(|frame| frame.delay as u32)
-                        .sum();
-                    let total_seconds = total_duration_cs / 100;
-                    let formatted = format!("{:02}:{:02}", total_seconds / 60, total_seconds % 60);
-                    ui.set_total_duration(SharedString::from(formatted));
-
-                    // フレームデータ構築
-                    let frame_data: Vec<FrameData> = gif_file
-                        .frames()
-                        .iter()
-                        .enumerate()
-                        .filter_map(|(i, f)| {
-                            gif_file.frame_image(i).map(|img| FrameData {
-                                image: img,
-                                delay: (f.delay as i32).max(2),
-                            })
-                        })
-                        .collect();
-                    let frames_model = Rc::new(VecModel::from(frame_data));
-                    // フレームタイムライン更新
-                    ui.set_frames(ModelRc::from(frames_model));
-                    ui.set_selected_frame_index(0);
-                    ui.set_filename(SharedString::from(filename));
-                    ui.set_gif_canvas_width(gif_file.canvas_width as i32);
-                    ui.set_gif_canvas_height(gif_file.canvas_height as i32);
+                    apply_gif_file_to_ui(&ui, &gif_file, filename);
                 }
                 Err(e) => {
+                    let label = if format_index == 0 { "GIF" } else { "動画" };
                     show_message_dialog(
                         "エラー",
-                        &format!("GIFの読み込みに失敗しました: {}", e),
+                        &format!("{label}の読み込みに失敗しました: {e}"),
                         &ui,
                     );
                 }

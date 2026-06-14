@@ -2,9 +2,17 @@
 
 - [svg](https://lucide.dev/icons/skip-forward)
 - tracingでログ出力
-- dialogの二重表示
-- ICO出力: 幅・高さは1..=256の制約があるため、imageops::resizeでアスペクト比を保ったまま縮小し、
-  256x256/128x128/64x64/32x32などのサイズをユーザーに選択させるUIが必要
+- ICO出力: 幅・高さは1..=256の制約があるため、imageops::resizeでアスペクト比を保ったまま縮小
+- 動画のストリーミング読み込みへの変更
+- 他OSへの対応
+  - focus window
+  - open folder
+  - ffmpeg binary
+    - [windows 8.1 lgpl](https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-n8.1-latest-win64-lgpl-8.1.zip)
+
+## Build
+
+`resources/ffmpeg/ffmpeg.exe` はリポジトリにpushしていないため、ダウンロードして梱包してビルドすること
 
 ## Coding Rule
 
@@ -265,3 +273,13 @@ cargo test --release compare_export_strategies -- --ignored --nocapture
 cargo test --release compare_export_strategies -- --ignored --nocapture *> bench_output.txt
 Get-Content bench_output.txt
 ```
+
+## 動画
+
+Container Format (Video Codec + Audio Codec) で構成
+
+Container, Video, Audioそれぞれに規格があり、組み合わせられている
+
+MP4でも、H.264 + AAC や H.264 + Opus のようにVideoは同じでもAudioのCodecが異なることがある
+
+そのため、全ての規格に対応させるには、`FFmpeg` を利用することが一般的
