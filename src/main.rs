@@ -14,8 +14,9 @@ use crate::gif_data::{Gif, GifFile};
 
 slint::include_modules!();
 
-// window表示用macro
-// 1. theme設定
+// window/dialog表示用macro
+// windowとdialogで型は異なるが使用方法は同じためmacroで定義
+// 1. set theme
 // 2. centralize window
 // 3. focus window
 macro_rules! show_window {
@@ -300,7 +301,9 @@ fn main() -> Result<()> {
 
     let gif_file_ref: Rc<RefCell<Option<GifFile>>> = Rc::new(RefCell::new(None));
 
-    // 再生Callback
+    // 毎回ownershipをmove
+    // move対象はブロックで使用している変数のみ
+    // EventListener内の参照ではスコープの管理が難しいため、upgradeする (参照できる場合のみ処理する) 方法で対応
     let ui_weak_for_play = ui.as_weak();
     ui.on_play(move |start_index| {
         let Some(ui) = ui_weak_for_play.upgrade() else {
