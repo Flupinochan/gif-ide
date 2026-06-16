@@ -14,8 +14,9 @@ use crate::gif_data::{Gif, GifFile};
 
 slint::include_modules!();
 
-// window表示用macro
-// 1. theme設定
+// window/dialog表示用macro
+// windowとdialogで型は異なるが使用方法は同じためmacroで定義
+// 1. set theme
 // 2. centralize window
 // 3. focus window
 macro_rules! show_window {
