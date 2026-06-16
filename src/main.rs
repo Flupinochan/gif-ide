@@ -254,7 +254,9 @@ fn main() -> Result<()> {
 
     let gif_file_ref: Rc<RefCell<Option<GifFile>>> = Rc::new(RefCell::new(None));
 
-    // 再生Callback
+    // 毎回ownershipをmove
+    // move対象はブロックで使用している変数のみ
+    // EventListener内の参照ではスコープの管理が難しいため、upgradeする (参照できる場合のみ処理する) 方法で対応
     let ui_weak_for_play = ui.as_weak();
     ui.on_play(move |start_index| {
         let Some(ui) = ui_weak_for_play.upgrade() else {
