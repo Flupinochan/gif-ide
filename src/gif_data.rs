@@ -1,4 +1,5 @@
 use crate::ffmpeg::{Ffmpeg, VideoMetadata};
+use crate::FrameData;
 use anyhow::Result;
 use slint::{Image, Rgba8Pixel, SharedPixelBuffer};
 use std::fs::File;
@@ -178,6 +179,20 @@ impl GifFile {
 
     pub fn frames_mut(&mut self) -> &mut [GifFrame] {
         &mut self.frames
+    }
+
+    // 生フレームからUI用モデルを構築
+    pub fn build_frame_data(&self) -> Vec<FrameData> {
+        self.frames()
+            .iter()
+            .enumerate()
+            .filter_map(|(i, f)| {
+                self.frame_image(i).map(|img| FrameData {
+                    image: img,
+                    delay: (f.delay as i32).max(2),
+                })
+            })
+            .collect()
     }
 }
 

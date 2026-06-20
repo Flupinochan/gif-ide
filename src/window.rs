@@ -1,4 +1,4 @@
-use crate::{AppWindow, MessageDialog, Palette};
+use crate::{AppWindow, MessageDialog};
 use slint::{ComponentHandle, SharedString};
 
 // window/dialog表示用macro
@@ -9,8 +9,8 @@ use slint::{ComponentHandle, SharedString};
 macro_rules! show_window {
     ($window:expr, $parent:expr) => {{
         $window
-            .global::<Palette>()
-            .set_color_scheme($parent.global::<Palette>().get_color_scheme());
+            .global::<crate::Palette>()
+            .set_color_scheme($parent.global::<crate::Palette>().get_color_scheme());
 
         let parent_pos = $parent.window().position();
         let parent_size = $parent.window().size();
