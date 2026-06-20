@@ -1,10 +1,9 @@
-use crate::ffmpeg::{get_ffmpeg_path, get_video_metadata, VideoMetadata};
+use crate::ffmpeg::{Ffmpeg, VideoMetadata};
 use anyhow::Result;
 use slint::{Image, Rgba8Pixel, SharedPixelBuffer};
 use std::fs::File;
 use std::io::{BufWriter, ErrorKind, Read};
 use std::path::Path;
-use std::process::{Command, Stdio};
 
 #[derive(Clone)]
 pub struct GifFrame {
@@ -57,24 +56,17 @@ impl GifFile {
 
     // 動画ファイルの読み込み (ffmpeg.exe/ffprobe.exeを利用)
     pub fn from_video(path: &Path) -> Result<Self> {
-        let ffprobe = get_ffmpeg_path("ffprobe.exe")?;
-        let ffmpeg = get_ffmpeg_path("ffmpeg.exe")?;
+        let ffmpeg = Ffmpeg::new()?;
 
         // メタデータを取得
         let VideoMetadata {
             width,
             height,
             delay,
-        } = get_video_metadata(ffprobe, path)?;
+        } = ffmpeg.get_video_metadata(path)?;
 
         // フレーム本体を取得
-        let mut child = Command::new(ffmpeg)
-            .args(["-v", "error", "-i"])
-            .arg(path)
-            .args(["-f", "rawvideo", "-pix_fmt", "rgba", "-"])
-            .stdout(Stdio::piped())
-            .stderr(Stdio::null())
-            .spawn()?;
+        let mut child = ffmpeg.spawn_raw_frames(path)?;
 
         let mut stdout = child.stdout.take().expect("stdoutはpipeで確保済み");
         let frame_size = width as usize * height as usize * 4;
@@ -175,7 +167,6 @@ impl GifFile {
         Ok(())
     }
 
-    /// start_index 番目のフレームを起点として、interval フレームごとに削除 (間引き)
     pub fn retain_frames(&mut self, interval: i32, start_index: i32) {
         let mut idx: i32 = 0;
         self.frames.retain(|_| {

@@ -1,12 +1,63 @@
 use anyhow::Result;
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Child, Command, Stdio};
+
+pub(crate) struct Ffmpeg {
+    ffmpeg_path: PathBuf,
+    ffprobe_path: PathBuf,
+}
+
+impl Ffmpeg {
+    pub(crate) fn new() -> Result<Self> {
+        Ok(Self {
+            ffmpeg_path: get_ffmpeg_path("ffmpeg.exe")?,
+            ffprobe_path: get_ffmpeg_path("ffprobe.exe")?,
+        })
+    }
+
+    // ffprobeによる動画メタデータ (解像度・フレームレート) の取得
+    pub(crate) fn get_video_metadata(&self, path: &Path) -> Result<VideoMetadata> {
+        let output = Command::new(&self.ffprobe_path)
+            .args([
+                "-v",
+                "error",
+                "-select_streams",
+                "v:0",
+                "-show_entries",
+                "stream=width,height,r_frame_rate",
+                "-of",
+                "default=noprint_wrappers=1",
+            ])
+            .arg(path)
+            .output()?;
+
+        if !output.status.success() {
+            return Err(anyhow::anyhow!(
+                "ffprobeの実行に失敗しました: {}",
+                String::from_utf8_lossy(&output.stderr)
+            ));
+        }
+
+        parse_ffprobe_output(&String::from_utf8_lossy(&output.stdout))
+    }
+
+    // ffmpegで動画を生のRGBAフレーム列に変換するプロセスを起動
+    pub(crate) fn spawn_raw_frames(&self, path: &Path) -> Result<Child> {
+        Ok(Command::new(&self.ffmpeg_path)
+            .args(["-v", "error", "-i"])
+            .arg(path)
+            .args(["-f", "rawvideo", "-pix_fmt", "rgba", "-"])
+            .stdout(Stdio::piped())
+            .stderr(Stdio::null())
+            .spawn()?)
+    }
+}
 
 // 優先: 実行ファイル同階層の `ffmpeg/<name>` / フォールバック (開発時): `CARGO_MANIFEST_DIR/resources/ffmpeg/<name>`
 //
 // TODO: 配布用ビルドではresources/ffmpeg/*.exeを実行ファイルと同階層の`ffmpeg/`に
 //       配置する手順を別途整備する (build.rsでの自動コピーは未対応)
-pub(crate) fn get_ffmpeg_path(name: &str) -> Result<PathBuf> {
+fn get_ffmpeg_path(name: &str) -> Result<PathBuf> {
     if let Ok(exe_path) = std::env::current_exe() {
         if let Some(dir) = exe_path.parent() {
             let candidate = dir.join("ffmpeg").join(name);
@@ -37,32 +88,6 @@ pub(crate) struct VideoMetadata {
     pub(crate) width: u16,
     pub(crate) height: u16,
     pub(crate) delay: u16,
-}
-
-// ffprobeによる動画メタデータ (解像度・フレームレート) の取得
-pub(crate) fn get_video_metadata(ffprobe: PathBuf, path: &Path) -> Result<VideoMetadata> {
-    let output = Command::new(ffprobe)
-        .args([
-            "-v",
-            "error",
-            "-select_streams",
-            "v:0",
-            "-show_entries",
-            "stream=width,height,r_frame_rate",
-            "-of",
-            "default=noprint_wrappers=1",
-        ])
-        .arg(path)
-        .output()?;
-
-    if !output.status.success() {
-        return Err(anyhow::anyhow!(
-            "ffprobeの実行に失敗しました: {}",
-            String::from_utf8_lossy(&output.stderr)
-        ));
-    }
-
-    parse_ffprobe_output(&String::from_utf8_lossy(&output.stdout))
 }
 
 // ffprobeの `-of default=noprint_wrappers=1` 出力 (key=value形式) のパース
