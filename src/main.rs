@@ -73,6 +73,21 @@ async fn import_video_file() -> Option<PathBuf> {
         .map(|handle| handle.path().to_path_buf())
 }
 
+// GifFileの生フレームからUI用モデルを構築
+fn build_frame_data(gif_file: &GifFile) -> Vec<FrameData> {
+    gif_file
+        .frames()
+        .iter()
+        .enumerate()
+        .filter_map(|(i, f)| {
+            gif_file.frame_image(i).map(|img| FrameData {
+                image: img,
+                delay: (f.delay as i32).max(2),
+            })
+        })
+        .collect()
+}
+
 // 読み込んだGifFileの内容をUIに反映する (GIF/動画どちらの読み込みでも共通)
 fn apply_gif_file_to_ui(ui: &AppWindow, gif_file: &GifFile, filename: String) {
     // 再生時間更新
@@ -85,20 +100,8 @@ fn apply_gif_file_to_ui(ui: &AppWindow, gif_file: &GifFile, filename: String) {
     let formatted = format!("{:02}:{:02}", total_seconds / 60, total_seconds % 60);
     ui.set_total_duration(SharedString::from(formatted));
 
-    // フレームデータ構築
-    let frame_data: Vec<FrameData> = gif_file
-        .frames()
-        .iter()
-        .enumerate()
-        .filter_map(|(i, f)| {
-            gif_file.frame_image(i).map(|img| FrameData {
-                image: img,
-                delay: (f.delay as i32).max(2),
-            })
-        })
-        .collect();
-    let frames_model = Rc::new(VecModel::from(frame_data));
     // フレームタイムライン更新
+    let frames_model = Rc::new(VecModel::from(build_frame_data(gif_file)));
     ui.set_frames(ModelRc::from(frames_model));
     ui.set_selected_frame_index(0);
     ui.set_filename(SharedString::from(filename));
@@ -298,6 +301,7 @@ fn main() -> Result<()> {
     let ui = AppWindow::new()?;
     let export_window = ExportFileWindow::new()?;
     let import_window = ImportFileWindow::new()?;
+    let edit_frame_drop_window = EditFrameDropWindow::new()?;
 
     let gif_file_ref: Rc<RefCell<Option<GifFile>>> = Rc::new(RefCell::new(None));
 
@@ -323,6 +327,7 @@ fn main() -> Result<()> {
 
     // delay一括適用Callback
     let ui_weak_for_bulk_delay = ui.as_weak();
+    let gif_ref_bulk_delay = gif_file_ref.clone();
     ui.on_apply_delay_to_all(move |delay| {
         let Some(ui) = ui_weak_for_bulk_delay.upgrade() else {
             return;
@@ -334,6 +339,92 @@ fn main() -> Result<()> {
                 frames.set_row_data(i, frame);
             }
         }
+
+        if let Some(gif) = gif_ref_bulk_delay.borrow_mut().as_mut() {
+            for raw_frame in gif.frames_mut() {
+                raw_frame.delay = delay.clamp(0, u16::MAX as i32) as u16;
+            }
+        }
+    });
+
+    // delay個別編集Callback
+    let ui_weak_for_delay = ui.as_weak();
+    let gif_ref_delay = gif_file_ref.clone();
+    ui.on_frame_delay_changed(move |index, delay| {
+        let Some(ui) = ui_weak_for_delay.upgrade() else {
+            return;
+        };
+        let frames = ui.get_frames();
+        if let Some(mut frame) = frames.row_data(index as usize) {
+            frame.delay = delay as i32;
+            frames.set_row_data(index as usize, frame);
+        }
+
+        if let Some(gif) = gif_ref_delay.borrow_mut().as_mut() {
+            if let Some(raw_frame) = gif.frames_mut().get_mut(index as usize) {
+                raw_frame.delay = delay.clamp(0.0, u16::MAX as f32) as u16;
+            }
+        }
+    });
+
+    // フレーム間引きウィンドウ表示Callback
+    let ui_weak_for_drop = ui.as_weak();
+    let drop_window_weak_show = edit_frame_drop_window.as_weak();
+    ui.on_edit_frame_drop(move || {
+        let (Some(ui), Some(drop_window)) =
+            (ui_weak_for_drop.upgrade(), drop_window_weak_show.upgrade())
+        else {
+            return;
+        };
+
+        let frames = ui.get_frames();
+        drop_window.set_current_total_frames(frames.row_count() as i32);
+
+        let preview: Vec<FramePreview> = (0..frames.row_count())
+            .filter_map(|i| frames.row_data(i))
+            .map(|f| FramePreview { image: f.image })
+            .collect();
+        drop_window.set_frames(ModelRc::from(Rc::new(VecModel::from(preview))));
+
+        show_window!(drop_window, ui);
+    });
+
+    // フレーム間引きウィンドウ Cancel Callback
+    let drop_window_weak_cancel = edit_frame_drop_window.as_weak();
+    edit_frame_drop_window.on_cancel(move || {
+        if let Some(w) = drop_window_weak_cancel.upgrade() {
+            w.hide().unwrap();
+        }
+    });
+
+    // フレーム間引き実行Callback
+    let ui_weak_for_start_drop = ui.as_weak();
+    let drop_window_weak_start = edit_frame_drop_window.as_weak();
+    let gif_ref_drop = gif_file_ref.clone();
+    edit_frame_drop_window.on_start_frame_drop(move || {
+        let (Some(ui), Some(drop_window)) = (
+            ui_weak_for_start_drop.upgrade(),
+            drop_window_weak_start.upgrade(),
+        ) else {
+            return;
+        };
+
+        let interval = drop_window.get_frame_drop_interval();
+        let start_index = drop_window.get_frame_drop_start_index();
+
+        let mut gif_ref = gif_ref_drop.borrow_mut();
+        let Some(gif) = gif_ref.as_mut() else {
+            return;
+        };
+
+        gif.retain_frames(interval, start_index);
+
+        let frame_data = build_frame_data(gif);
+        let new_len = frame_data.len() as i32;
+        ui.set_frames(ModelRc::from(Rc::new(VecModel::from(frame_data))));
+        ui.set_selected_frame_index(ui.get_selected_frame_index().clamp(0, new_len - 1));
+
+        drop_window.hide().unwrap();
     });
 
     // 読み込みウィンドウ表示Callback

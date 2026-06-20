@@ -1,0 +1,209 @@
+import {
+    SpinBox,
+    Palette,
+    ScrollView,
+    Spinner,
+    Button,
+} from "std-widgets.slint";
+import { Style } from "global-styles.slint";
+
+export enum FrameDropState {
+    form,
+    processing,
+    success,
+}
+
+export struct FramePreview {
+    image: image,
+}
+
+export component EditFrameDropWindow inherits Window {
+    in-out property <int> current-total-frames;
+    in-out property <int> frame-drop-interval: 10;
+    in-out property <int> frame-drop-start-index: 1;
+    in property <[FramePreview]> frames: [];
+    in property <FrameDropState> state: FrameDropState.form;
+    property <int> remaining-frames: current-total-frames - (frame-drop-start-index <= current-total-frames ? Math.floor((current-total-frames - frame-drop-start-index) / frame-drop-interval) + 1 : 0);
+    callback start-frame-drop();
+    callback cancel();
+
+    title: "フレームを間引く";
+    default-font-family: Style.font-family;
+    preferred-width: 460px;
+    height: self.preferred-height;
+
+    VerticalLayout {
+        padding: 16px;
+        spacing: 16px;
+
+        // interval 指定
+        HorizontalLayout {
+            spacing: 10px;
+            alignment: start;
+
+            SpinBox {
+                width: 100px;
+                minimum: 2;
+                maximum: 60;
+                value <=> root.frame-drop-interval;
+            }
+
+            HorizontalLayout {
+                Text {
+                    text: " フレームごとに ";
+                    vertical-alignment: center;
+                }
+
+                Text {
+                    text: "1";
+                    color: Palette.accent-background;
+                    font-weight: FontWeight.bold;
+                    vertical-alignment: center;
+                }
+
+                Text {
+                    text: " フレームを削除";
+                    vertical-alignment: center;
+                }
+            }
+        }
+
+        // start-index 指定
+        HorizontalLayout {
+            spacing: 10px;
+            alignment: start;
+
+            SpinBox {
+                width: 100px;
+                minimum: 1;
+                maximum: root.frame-drop-interval;
+                value <=> root.frame-drop-start-index;
+            }
+
+            Text {
+                text: " 番目のフレームから削除開始";
+                vertical-alignment: center;
+            }
+        }
+
+        // フレーム数表示 (start-index 考慮)
+        HorizontalLayout {
+            spacing: 10px;
+            alignment: start;
+
+            Text {
+                text: current-total-frames;
+                font-size: 14px;
+            }
+
+            Text {
+                text: "→";
+                font-size: 14px;
+            }
+
+            Text {
+                text: root.remaining-frames;
+                color: Palette.accent-background;
+                font-size: 14px;
+            }
+
+            Text {
+                text: "frames";
+                font-size: 14px;
+            }
+        }
+
+        // プレビュー
+        if frames.length > 0: VerticalLayout {
+            ScrollView {
+                height: preview-list.preferred-height;
+                viewport-width: preview-list.preferred-width;
+
+                preview-list := HorizontalLayout {
+                    spacing: 8px;
+                    alignment: start;
+                    padding-bottom: 22px;
+
+                    for frame[i] in root.frames: VerticalLayout {
+                        width: 64px;
+                        spacing: 10px;
+                        property <bool> is-drop:
+                            i - Math.floor(i / root.frame-drop-interval) * root.frame-drop-interval == root.frame-drop-start-index - 1;
+
+                        Rectangle {
+                            height: 50px;
+                            border-width: 1px;
+                            border-color: is-drop ? Colors.red : Palette.foreground.transparentize(0.7);
+                            border-radius: 4px;
+                            clip: true;
+
+                            Image {
+                                width: parent.width;
+                                height: parent.height;
+                                source: frame.image;
+                                image-fit: cover;
+                            }
+
+                            Rectangle {
+                                x: 4px;
+                                y: parent.height - self.height - 4px;
+                                width: num.preferred-width + 6px;
+                                height: num.preferred-height + 2px;
+                                border-radius: 2px;
+                                background: Palette.background.transparentize(0.3);
+
+                                num := Text {
+                                    x: 3px;
+                                    font-size: 10px;
+                                    color: Palette.foreground;
+                                    text: i + 1;
+                                }
+                            }
+
+                            if is-drop: Rectangle {
+                                background: Colors.red.transparentize(0.75);
+
+                                Image {
+                                    source: @image-url("assets/x.svg");
+                                    colorize: Colors.red;
+                                    width: 20px;
+                                    height: 20px;
+                                    x: (parent.width - self.width) / 2;
+                                    y: (parent.height - self.height) / 2;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // OK / Cancel
+        HorizontalLayout {
+            alignment: end;
+            padding-top: 10px;
+            spacing: 10px;
+
+            if root.state == FrameDropState.form || root.state == FrameDropState.success: Button {
+                text: "OK";
+                primary: true;
+                enabled: root.remaining-frames > 0;
+                clicked => {
+                    root.start-frame-drop();
+                }
+            }
+
+            if root.state == FrameDropState.processing: Spinner {
+                indeterminate: true;
+            }
+
+            Button {
+                text: "Cancel";
+                enabled: root.state == FrameDropState.form || root.state == FrameDropState.success;
+                clicked => {
+                    root.cancel();
+                }
+            }
+        }
+    }
+}

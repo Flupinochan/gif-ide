@@ -287,6 +287,20 @@ impl GifFile {
         }
         Ok(())
     }
+
+    /// start_index 番目のフレームを起点として、interval フレームごとに削除 (間引き)
+    pub fn retain_frames(&mut self, interval: i32, start_index: i32) {
+        let mut idx: i32 = 0;
+        self.frames.retain(|_| {
+            let keep = idx % interval != start_index - 1;
+            idx += 1;
+            keep
+        });
+    }
+
+    pub fn frames_mut(&mut self) -> &mut [GifFrame] {
+        &mut self.frames
+    }
 }
 
 impl Gif for GifFile {

@@ -6,11 +6,13 @@ import {
     ScrollView,
     AboutSlint,
     LineEdit,
+    SpinBox,
 } from "std-widgets.slint";
 import { Style } from "global-styles.slint";
 export { MessageDialog } from "message-dialog.slint";
 export { ExportFileWindow } from "export-file-window.slint";
 export { ImportFileWindow } from "import-file-window.slint";
+export { EditFrameDropWindow, FramePreview, FrameDropState } from "edit-frame-drop-window.slint";
 // ThemeはWindowごとに保有されるため、ExportしてDialogを開く際にThemeを必ず渡す
 export { Palette } from "std-widgets.slint";
 
@@ -21,7 +23,7 @@ struct FrameData {
 
 export component AppWindow inherits Window {
     in-out property <int> current-tab: 0;
-    in-out property <[FrameData]> frames: [];
+    in property <[FrameData]> frames: [];
     in-out property <int> selected-frame-index: 0;
     in property <bool> is-loading: false;
     in-out property <bool> is-play: false;
@@ -35,6 +37,8 @@ export component AppWindow inherits Window {
     callback export-file();
     callback play(int);
     callback apply-delay-to-all(int);
+    callback frame-delay-changed(int, float);
+    callback edit-frame-drop;
 
     title: "GIF IDE";
     default-font-family: Style.font-family;
@@ -359,7 +363,7 @@ export component AppWindow inherits Window {
                                                     } else {
                                                         self.text = 0;
                                                     }
-                                                    root.frames[i].delay = self.text.to-float();
+                                                    root.frame-delay-changed(i, self.text.to-float());
                                                 }
                                                 accepted(text) => {
                                                     self.clear-focus();
@@ -407,177 +411,151 @@ export component AppWindow inherits Window {
             // Side Bar
             VerticalLayout {
                 width: root.sidebar-width;
+                alignment: space-between;
 
-                // 設定/その他
-                HorizontalLayout {
-                    alignment: start;
-                    padding-top: 12px;
-                    padding-right: 12px;
-                    padding-left: 12px;
-                    padding-bottom: 4px;
-                    spacing: 20px;
-
-                    for label[i] in ["設定", "その他"]: TouchArea {
-                        clicked => {
-                            root.current-tab = i;
-                        }
-
-                        VerticalLayout {
-                            spacing: 8px;
-                            Text {
-                                height: 20px;
-                                vertical-alignment: center;
-                                text: label;
-                                font-size: 14px;
-                                color: root.current-tab == i ? Palette.foreground : Palette.foreground.transparentize(0.5);
-                            }
-
-                            Rectangle {
-                                height: 2px;
-                                border-radius: 1px;
-                                background: root.current-tab == i ? Palette.accent-background : transparent;
-                            }
-                        }
-                    }
-                    Rectangle { }
-                }
-
-                Rectangle {
-                    height: 1px;
-                    background: Palette.foreground.transparentize(0.7);
-                }
-
-                if current-tab == 0: VerticalLayout {
-                    alignment: space-between;
-
-                    VerticalLayout {
+                VerticalLayout {
                     // File Info
-                        VerticalLayout {
-                            padding: 12px;
-                            spacing: 4px;
-                            alignment: center;
+                    VerticalLayout {
+                        padding: 12px;
+                        spacing: 4px;
+                        alignment: center;
 
-                            // 小見出し
+                        // 小見出し
+                        Text {
+                            text: "GIF 情報";
+                            font-size: 13px;
+                            font-weight: FontWeight.medium;
+                            color: Palette.foreground.transparentize(0.3);
+                        }
+
+                        // ファイル名
+                        HorizontalLayout {
+                            alignment: space-between;
+
                             Text {
-                                text: "GIF 情報";
-                                font-size: 13px;
-                                font-weight: FontWeight.medium;
-                                color: Palette.foreground.transparentize(0.3);
+                                text: "ファイル名";
+                                color: Palette.foreground.transparentize(0.5);
+                                vertical-alignment: center;
                             }
 
-                            // ファイル名
-                            HorizontalLayout {
-                                alignment: space-between;
-
-                                Text {
-                                    text: "ファイル名";
-                                    font-size: 12px;
-                                    color: Palette.foreground.transparentize(0.5);
-                                    vertical-alignment: center;
-                                }
-
-                                Text {
-                                    text: filename == "" ? "---" : filename;
-                                    font-size: 12px;
-                                    color: Palette.foreground.transparentize(0.5);
-                                    vertical-alignment: center;
-                                }
-                            }
-
-                            // 総フレーム数
-                            HorizontalLayout {
-                                alignment: space-between;
-
-                                Text {
-                                    text: "総フレーム数";
-                                    font-size: 12px;
-                                    color: Palette.foreground.transparentize(0.5);
-                                    vertical-alignment: center;
-                                }
-
-                                Text {
-                                    text: frames.length == 0 ? "---" : frames.length;
-                                    font-size: 12px;
-                                    color: Palette.foreground.transparentize(0.5);
-                                    vertical-alignment: center;
-                                }
-                            }
-
-                            // GIF Canvasサイズ
-                            HorizontalLayout {
-                                alignment: space-between;
-
-                                Text {
-                                    text: "サイズ";
-                                    font-size: 12px;
-                                    color: Palette.foreground.transparentize(0.5);
-                                    vertical-alignment: center;
-                                }
-
-                                Text {
-                                    text: gif-canvas-width == 0 ? "---" : gif-canvas-width + " x " + gif-canvas-height;
-                                    font-size: 12px;
-                                    color: Palette.foreground.transparentize(0.5);
-                                    vertical-alignment: center;
-                                }
-                            }
-                        }
-
-                        Rectangle {
-                            height: 1px;
-                            background: Palette.foreground.transparentize(0.7);
-                        }
-
-                        // Export
-                        VerticalLayout {
-                            padding: 12px;
-                            spacing: 8px;
-                            alignment: center;
-
-                            // 小見出し
                             Text {
-                                text: "入力/出力";
-                                font-size: 13px;
-                                font-weight: FontWeight.medium;
-                                color: Palette.foreground.transparentize(0.3);
-                            }
-
-                            Button {
-                                text: "ファイル選択";
-                                enabled: !is-play;
-                                clicked => {
-                                    root.import-file();
-                                }
-                            }
-
-                            Button {
-                                text: "出力";
-                                primary: true;
-                                enabled: !is-play && frames.length > 0;
-                                clicked => {
-                                    root.export-file();
-                                }
+                                text: filename == "" ? "---" : filename;
+                                color: Palette.foreground.transparentize(0.5);
+                                vertical-alignment: center;
                             }
                         }
 
-                        Rectangle {
-                            height: 1px;
-                            background: Palette.foreground.transparentize(0.7);
+                        // 総フレーム数
+                        HorizontalLayout {
+                            alignment: space-between;
+
+                            Text {
+                                text: "総フレーム数";
+                                color: Palette.foreground.transparentize(0.5);
+                                vertical-alignment: center;
+                            }
+
+                            Text {
+                                text: frames.length == 0 ? "---" : frames.length;
+                                color: Palette.foreground.transparentize(0.5);
+                                vertical-alignment: center;
+                            }
+                        }
+
+                        // GIF Canvasサイズ
+                        HorizontalLayout {
+                            alignment: space-between;
+
+                            Text {
+                                text: "サイズ";
+                                color: Palette.foreground.transparentize(0.5);
+                                vertical-alignment: center;
+                            }
+
+                            Text {
+                                text: gif-canvas-width == 0 ? "---" : gif-canvas-width + " x " + gif-canvas-height;
+                                color: Palette.foreground.transparentize(0.5);
+                                vertical-alignment: center;
+                            }
                         }
                     }
 
+                    Rectangle {
+                        height: 1px;
+                        background: Palette.foreground.transparentize(0.7);
+                    }
+
+                    // Edit
                     VerticalLayout {
-                        padding-bottom: 10px;
-                        AboutSlint {
-                            height: 100px;
+                        padding: 12px;
+                        spacing: 8px;
+                        alignment: center;
+
+                        // 小見出し
+                        Text {
+                            text: "編集";
+                            font-size: 13px;
+                            font-weight: FontWeight.medium;
+                            color: Palette.foreground.transparentize(0.3);
                         }
+
+                        // 間引く
+                        Button {
+                            text: "フレームを間引く";
+                            enabled: !is-play && frames.length > 0;
+                            clicked => {
+                                root.edit-frame-drop();
+                            }
+                        }
+                    }
+
+                    Rectangle {
+                        height: 1px;
+                        background: Palette.foreground.transparentize(0.7);
+                    }
+
+                    // Export
+                    VerticalLayout {
+                        padding: 12px;
+                        spacing: 8px;
+                        alignment: center;
+
+                        // 小見出し
+                        Text {
+                            text: "入力/出力";
+                            font-size: 13px;
+                            font-weight: FontWeight.medium;
+                            color: Palette.foreground.transparentize(0.3);
+                        }
+
+                        Button {
+                            text: "ファイル選択";
+                            enabled: !is-play;
+                            clicked => {
+                                root.import-file();
+                            }
+                        }
+
+                        Button {
+                            text: "出力";
+                            primary: true;
+                            enabled: !is-play && frames.length > 0;
+                            clicked => {
+                                root.export-file();
+                            }
+                        }
+                    }
+
+                    Rectangle {
+                        height: 1px;
+                        background: Palette.foreground.transparentize(0.7);
                     }
                 }
 
-                if current-tab == 1: VerticalLayout {
-                    Text {
-                        text: "...";
-                        color: Palette.foreground.transparentize(0.5);
+                VerticalLayout {
+                    padding-bottom: 10px;
+                    AboutSlint {
+                        height: 100px;
                     }
                 }
             }
