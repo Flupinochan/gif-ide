@@ -7,16 +7,6 @@
 cargo buildも不要です。無意味のためです。コンパイルエラーはvscode画面上で確認できます
 Cargo.toml の dependencies / build-dependencies に新しい依存関係を勝手に追加しないでください。追加が必要な場合は、追加理由を説明したうえで必ずユーザに確認を取ってください
 
-コード修正後は以下を実行し、エラー・警告を解消してください
-
-# リンター
-cargo clippy
-
-# フォーマッター
-cargo fmt
-
-# 構文チェック
-cargo check
 
 ## Architecture
 
@@ -28,3 +18,9 @@ cargo check
 | -------- | ----------------- |
 | ui/      | slintを使用したUI |
 | src/     | Rustロジック      |
+
+### データフロー方針
+
+- UI操作はcallbackとしてのみRustへ通知し、Slint側で業務データ (frames等) を直接書き換えない (View → callback → Rustが正規データを更新 → set_xxxでUIに反映、の一方通行)
+- 業務データを持つpropertyは `in-out` ではなく `in` にする (Rustのみ書き込み可、Slint側は読み取り専用にして直接書き換えを構文的に防ぐ)
+- Rust側 (`GifFile`) を唯一の正規データとして保持し、UIの表示用モデル (`frames`等) はそこから都度生成する
