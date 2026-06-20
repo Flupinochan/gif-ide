@@ -1,8 +1,9 @@
+use crate::ffmpeg::{get_ffmpeg_path, get_video_metadata, VideoMetadata};
 use anyhow::Result;
 use slint::{Image, Rgba8Pixel, SharedPixelBuffer};
 use std::fs::File;
 use std::io::{BufWriter, ErrorKind, Read};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::{Command, Stdio};
 
 #[derive(Clone)]
@@ -26,120 +27,6 @@ pub struct GifFile {
 pub trait Gif {
     fn frames(&self) -> &[GifFrame];
     fn frame_image(&self, index: usize) -> Option<Image>;
-}
-
-// 優先: 実行ファイル同階層の `ffmpeg/<name>` / フォールバック (開発時): `CARGO_MANIFEST_DIR/resources/ffmpeg/<name>`
-//
-// TODO: 配布用ビルドではresources/ffmpeg/*.exeを実行ファイルと同階層の`ffmpeg/`に
-//       配置する手順を別途整備する (build.rsでの自動コピーは未対応)
-fn get_ffmpeg_path(name: &str) -> Result<PathBuf> {
-    if let Ok(exe_path) = std::env::current_exe() {
-        if let Some(dir) = exe_path.parent() {
-            let candidate = dir.join("ffmpeg").join(name);
-            if candidate.exists() {
-                return Ok(candidate);
-            }
-        }
-    }
-
-    #[cfg(debug_assertions)]
-    {
-        let candidate = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("resources")
-            .join("ffmpeg")
-            .join(name);
-        if candidate.exists() {
-            return Ok(candidate);
-        }
-    }
-
-    Err(anyhow::anyhow!(
-        "{name} が見つかりません。resources/ffmpeg/ に配置してください"
-    ))
-}
-
-// ffprobeから取得した動画のメタデータ
-struct VideoMetadata {
-    width: u16,
-    height: u16,
-    delay: u16,
-}
-
-// ffprobeによる動画メタデータ (解像度・フレームレート) の取得
-fn get_video_metadata(ffprobe: PathBuf, path: &Path) -> Result<VideoMetadata> {
-    let output = Command::new(ffprobe)
-        .args([
-            "-v",
-            "error",
-            "-select_streams",
-            "v:0",
-            "-show_entries",
-            "stream=width,height,r_frame_rate",
-            "-of",
-            "default=noprint_wrappers=1",
-        ])
-        .arg(path)
-        .output()?;
-
-    if !output.status.success() {
-        return Err(anyhow::anyhow!(
-            "ffprobeの実行に失敗しました: {}",
-            String::from_utf8_lossy(&output.stderr)
-        ));
-    }
-
-    parse_ffprobe_output(&String::from_utf8_lossy(&output.stdout))
-}
-
-// ffprobeの `-of default=noprint_wrappers=1` 出力 (key=value形式) のパース
-fn parse_ffprobe_output(output: &str) -> Result<VideoMetadata> {
-    let mut width = None;
-    let mut height = None;
-    let mut delay = None;
-
-    for line in output.lines() {
-        let Some((key, value)) = line.split_once('=') else {
-            continue;
-        };
-        match key.trim() {
-            "width" => width = value.trim().parse::<u16>().ok(),
-            "height" => height = value.trim().parse::<u16>().ok(),
-            "r_frame_rate" => {
-                delay = value
-                    .trim()
-                    .split_once('/')
-                    .and_then(|(numerator, denominator)| {
-                        let numerator: f64 = numerator.parse().ok()?;
-                        let denominator: f64 = denominator.parse().ok()?;
-                        if denominator == 0.0 {
-                            return None;
-                        }
-                        let fps = numerator / denominator;
-                        if fps <= 0.0 {
-                            Some(10)
-                        } else {
-                            Some(
-                                (100.0 / fps)
-                                    .round()
-                                    .clamp(u16::MIN as f64, u16::MAX as f64)
-                                    as u16,
-                            )
-                        }
-                    });
-            }
-            _ => {}
-        }
-    }
-
-    let width = width.ok_or_else(|| anyhow::anyhow!("widthの取得に失敗しました"))?;
-    let height = height.ok_or_else(|| anyhow::anyhow!("heightの取得に失敗しました"))?;
-    let delay = delay.ok_or_else(|| anyhow::anyhow!("フレームレートの取得に失敗しました"))?;
-
-    Ok(VideoMetadata {
-        width,
-        height,
-        delay,
-    })
 }
 
 impl GifFile {
