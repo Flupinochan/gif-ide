@@ -89,7 +89,7 @@ fn build_frame_data(gif_file: &GifFile) -> Vec<FrameData> {
         .collect()
 }
 
-// 読み込んだGifFileの内容をUIに反映する (GIF/動画どちらの読み込みでも共通)
+// 読み込んだGifFileの内容をUIに反映
 fn apply_gif_file_to_ui(ui: &AppWindow, gif_file: &GifFile, filename: String) {
     // 再生時間更新
     let total_duration_cs: u32 = gif_file
@@ -309,9 +309,9 @@ fn main() -> Result<()> {
     // 毎回ownershipをmove
     // move対象はブロックで使用している変数のみ
     // EventListener内の参照ではスコープの管理が難しいため、upgradeする (参照できる場合のみ処理する) 方法で対応
-    let ui_weak_for_play = ui.as_weak();
+    let ui_weak_play = ui.as_weak();
     ui.on_play(move |start_index| {
-        let Some(ui) = ui_weak_for_play.upgrade() else {
+        let Some(ui) = ui_weak_play.upgrade() else {
             return;
         };
         if ui.get_is_play() {
@@ -327,10 +327,10 @@ fn main() -> Result<()> {
     });
 
     // delay一括適用Callback
-    let ui_weak_for_bulk_delay = ui.as_weak();
+    let ui_weak_apply_delay_to_all = ui.as_weak();
     let gif_ref_bulk_delay = gif_file_ref.clone();
     ui.on_apply_delay_to_all(move |delay| {
-        let Some(ui) = ui_weak_for_bulk_delay.upgrade() else {
+        let Some(ui) = ui_weak_apply_delay_to_all.upgrade() else {
             return;
         };
         let frames = ui.get_frames();
@@ -349,10 +349,10 @@ fn main() -> Result<()> {
     });
 
     // delay個別編集Callback
-    let ui_weak_for_delay = ui.as_weak();
+    let ui_weak_frame_delay_changed = ui.as_weak();
     let gif_ref_delay = gif_file_ref.clone();
     ui.on_frame_delay_changed(move |index, delay| {
-        let Some(ui) = ui_weak_for_delay.upgrade() else {
+        let Some(ui) = ui_weak_frame_delay_changed.upgrade() else {
             return;
         };
         let frames = ui.get_frames();
@@ -369,12 +369,13 @@ fn main() -> Result<()> {
     });
 
     // フレーム間引きウィンドウ表示Callback
-    let ui_weak_for_drop = ui.as_weak();
-    let drop_window_weak_show = edit_frame_drop_window.as_weak();
+    let ui_weak_edit_frame_drop = ui.as_weak();
+    let drop_window_weak_edit_frame_drop = edit_frame_drop_window.as_weak();
     ui.on_edit_frame_drop(move || {
-        let (Some(ui), Some(drop_window)) =
-            (ui_weak_for_drop.upgrade(), drop_window_weak_show.upgrade())
-        else {
+        let (Some(ui), Some(drop_window)) = (
+            ui_weak_edit_frame_drop.upgrade(),
+            drop_window_weak_edit_frame_drop.upgrade(),
+        ) else {
             return;
         };
 
@@ -399,13 +400,13 @@ fn main() -> Result<()> {
     });
 
     // フレーム間引き実行Callback
-    let ui_weak_for_start_drop = ui.as_weak();
-    let drop_window_weak_start = edit_frame_drop_window.as_weak();
+    let ui_weak_start_frame_drop = ui.as_weak();
+    let drop_window_weak_start_frame_drop = edit_frame_drop_window.as_weak();
     let gif_ref_drop = gif_file_ref.clone();
     edit_frame_drop_window.on_start_frame_drop(move || {
         let (Some(ui), Some(drop_window)) = (
-            ui_weak_for_start_drop.upgrade(),
-            drop_window_weak_start.upgrade(),
+            ui_weak_start_frame_drop.upgrade(),
+            drop_window_weak_start_frame_drop.upgrade(),
         ) else {
             return;
         };
@@ -429,12 +430,13 @@ fn main() -> Result<()> {
     });
 
     // 読み込みウィンドウ表示Callback
-    let ui_weak_import = ui.as_weak();
-    let import_window_weak_show = import_window.as_weak();
+    let ui_weak_import_file = ui.as_weak();
+    let import_window_weak_import_file = import_window.as_weak();
     ui.on_import_file(move || {
-        let (Some(ui), Some(import_window)) =
-            (ui_weak_import.upgrade(), import_window_weak_show.upgrade())
-        else {
+        let (Some(ui), Some(import_window)) = (
+            ui_weak_import_file.upgrade(),
+            import_window_weak_import_file.upgrade(),
+        ) else {
             return;
         };
 
@@ -442,14 +444,14 @@ fn main() -> Result<()> {
     });
 
     // 読み込み元選択Callback
-    let import_window_weak_pick = import_window.as_weak();
+    let import_window_weak_select_import_path = import_window.as_weak();
     import_window.on_select_import_path(move || {
-        let Some(import_window) = import_window_weak_pick.upgrade() else {
+        let Some(import_window) = import_window_weak_select_import_path.upgrade() else {
             return;
         };
 
         let format_index = import_window.get_format_index();
-        let import_window_weak = import_window.as_weak();
+        let import_window_weak_select_import_path = import_window.as_weak();
         slint::spawn_local(async move {
             let path = if format_index == 0 {
                 import_file().await
@@ -458,7 +460,7 @@ fn main() -> Result<()> {
             };
 
             let _ = slint::invoke_from_event_loop(move || {
-                let Some(import_window) = import_window_weak.upgrade() else {
+                let Some(import_window) = import_window_weak_select_import_path.upgrade() else {
                     return;
                 };
                 if let Some(path) = path {
@@ -471,13 +473,14 @@ fn main() -> Result<()> {
     });
 
     // 読み込み実行Callback
-    let ui_weak_start = ui.as_weak();
-    let import_window_weak_start = import_window.as_weak();
+    let ui_weak_start_import = ui.as_weak();
+    let import_window_weak_start_import = import_window.as_weak();
     let gif_ref_import = gif_file_ref.clone();
     import_window.on_start_import(move || {
-        let (Some(ui), Some(import_window)) =
-            (ui_weak_start.upgrade(), import_window_weak_start.upgrade())
-        else {
+        let (Some(ui), Some(import_window)) = (
+            ui_weak_start_import.upgrade(),
+            import_window_weak_start_import.upgrade(),
+        ) else {
             return;
         };
 
@@ -492,7 +495,7 @@ fn main() -> Result<()> {
         import_window.hide().unwrap();
         ui.set_is_loading(true);
 
-        let ui_weak = ui.as_weak();
+        let ui_weak_start_import = ui.as_weak();
         let gif_ref = gif_ref_import.clone();
         slint::spawn_local(async move {
             let result = tokio::task::spawn_blocking(move || {
@@ -505,7 +508,9 @@ fn main() -> Result<()> {
             .await
             .unwrap();
 
-            let Some(ui) = ui_weak.upgrade() else { return };
+            let Some(ui) = ui_weak_start_import.upgrade() else {
+                return;
+            };
             ui.set_is_loading(false);
             match result {
                 Ok(gif_file) => {
@@ -534,19 +539,20 @@ fn main() -> Result<()> {
     });
 
     // 出力ウィンドウCallback
-    let ui_weak_ok = ui.as_weak();
-    let export_window_weak_ok = export_window.as_weak();
+    let ui_weak_start_export = ui.as_weak();
+    let export_window_weak_start_export = export_window.as_weak();
     let gif_ref_ok = gif_file_ref.clone();
     export_window.on_start_export(move || {
-        let (Some(export_window), Some(ui)) =
-            (export_window_weak_ok.upgrade(), ui_weak_ok.upgrade())
-        else {
+        let (Some(export_window), Some(ui)) = (
+            export_window_weak_start_export.upgrade(),
+            ui_weak_start_export.upgrade(),
+        ) else {
             return;
         };
 
         let path = PathBuf::from(export_window.get_export_path().as_str());
-        let export_window_weak = export_window.as_weak();
-        let ui_weak = ui.as_weak();
+        let export_window_weak_start_export = export_window.as_weak();
+        let ui_weak_start_export = ui.as_weak();
 
         enum ExportJob {
             Gif {
@@ -622,12 +628,12 @@ fn main() -> Result<()> {
 
                     let _ = slint::invoke_from_event_loop(move || match result {
                         Ok(()) => {
-                            if let Some(export_window) = export_window_weak.upgrade() {
+                            if let Some(export_window) = export_window_weak_start_export.upgrade() {
                                 export_window.set_state(ExportState::Success);
                             }
                         }
                         Err(e) => {
-                            if let Some(ui) = ui_weak.upgrade() {
+                            if let Some(ui) = ui_weak_start_export.upgrade() {
                                 show_message_dialog(
                                     "エラー",
                                     &format!("GIFの出力に失敗しました: {}", e),
@@ -688,12 +694,12 @@ fn main() -> Result<()> {
 
                     let _ = slint::invoke_from_event_loop(move || match result {
                         Ok(()) => {
-                            if let Some(export_window) = export_window_weak.upgrade() {
+                            if let Some(export_window) = export_window_weak_start_export.upgrade() {
                                 export_window.set_state(ExportState::Success);
                             }
                         }
                         Err(e) => {
-                            if let Some(ui) = ui_weak.upgrade() {
+                            if let Some(ui) = ui_weak_start_export.upgrade() {
                                 show_message_dialog(
                                     "エラー",
                                     &format!("画像の出力に失敗しました: {}", e),
@@ -715,24 +721,24 @@ fn main() -> Result<()> {
         }
     });
 
-    let export_window_weak_open = export_window.as_weak();
+    let export_window_weak_open_export_folder = export_window.as_weak();
     export_window.on_open_export_folder(move || {
-        let Some(export_window) = export_window_weak_open.upgrade() else {
+        let Some(export_window) = export_window_weak_open_export_folder.upgrade() else {
             return;
         };
         let path = PathBuf::from(export_window.get_export_path().as_str());
         open_in_explorer(&path);
     });
 
-    let export_window_weak_pick = export_window.as_weak();
+    let export_window_weak_select_export_path = export_window.as_weak();
     export_window.on_select_export_path(move || {
-        let Some(export_window) = export_window_weak_pick.upgrade() else {
+        let Some(export_window) = export_window_weak_select_export_path.upgrade() else {
             return;
         };
 
         let format_index = export_window.get_format_index();
         let is_gif = export_window.get_is_gif();
-        let export_window_weak = export_window.as_weak();
+        let export_window_weak_select_export_path = export_window.as_weak();
         slint::spawn_local(async move {
             let path = if is_gif {
                 save_gif_file().await
@@ -741,7 +747,7 @@ fn main() -> Result<()> {
             };
 
             let _ = slint::invoke_from_event_loop(move || {
-                let Some(export_window) = export_window_weak.upgrade() else {
+                let Some(export_window) = export_window_weak_select_export_path.upgrade() else {
                     return;
                 };
                 if let Some(path) = path {
@@ -754,12 +760,13 @@ fn main() -> Result<()> {
     });
 
     // 画像出力Callback
-    let ui_weak_image = ui.as_weak();
-    let export_window_weak_show = export_window.as_weak();
+    let ui_weak_export_file = ui.as_weak();
+    let export_window_weak_export_file = export_window.as_weak();
     ui.on_export_file(move || {
-        let (Some(ui), Some(export_window)) =
-            (ui_weak_image.upgrade(), export_window_weak_show.upgrade())
-        else {
+        let (Some(ui), Some(export_window)) = (
+            ui_weak_export_file.upgrade(),
+            export_window_weak_export_file.upgrade(),
+        ) else {
             return;
         };
 

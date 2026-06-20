@@ -20,3 +20,6 @@ ui/トレサ.png
 
 # resources
 resources/
+
+# Slint Document
+docs/development

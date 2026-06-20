@@ -24,3 +24,8 @@ Cargo.toml の dependencies / build-dependencies に新しい依存関係を勝�
 - UI操作はcallbackとしてのみRustへ通知し、Slint側で業務データ (frames等) を直接書き換えない (View → callback → Rustが正規データを更新 → set_xxxでUIに反映、の一方通行)
 - 業務データを持つpropertyは `in-out` ではなく `in` にする (Rustのみ書き込み可、Slint側は読み取り専用にして直接書き換えを構文的に防ぐ)
 - Rust側 (`GifFile`) を唯一の正規データとして保持し、UIの表示用モデル (`frames`等) はそこから都度生成する
+
+### 命名規則
+
+- `as_weak()` で取得した変数は `<元の変数名>_weak` の接尾辞で命名する (例: `ui.as_weak()` → `ui_weak`)
+- 同じコンポーネントから複数のcallback向けにweak参照を複製する場合は、対応するcallback名をさらに付与する (例: `on_play` 用 → `ui_weak_play`)
