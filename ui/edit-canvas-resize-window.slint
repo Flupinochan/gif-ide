@@ -1,0 +1,165 @@
+import {
+    SpinBox,
+    Palette,
+    Spinner,
+    Button,
+    ComboBox,
+} from "std-widgets.slint";
+import { Style } from "global-styles.slint";
+
+export enum CanvasResizeState {
+    form,
+    processing,
+    success,
+}
+
+export component EditCanvasResizeWindow inherits Window {
+    in-out property <int> current-canvas-width;
+    in-out property <int> current-canvas-height;
+    in-out property <int> new-canvas-width: 0;
+    in-out property <int> new-canvas-height: 0;
+    in-out property <int> filter-type-index: 0;
+    in property <CanvasResizeState> state: CanvasResizeState.form;
+    callback start-canvas-resize();
+    callback cancel();
+
+    title: "キャンバスサイズを変更";
+    default-font-family: Style.font-family;
+    height: self.preferred-height;
+
+    VerticalLayout {
+        padding: 16px;
+        spacing: 16px;
+
+        if root.state == CanvasResizeState.success: Rectangle {
+            background: Colors.green.transparentize(0.85);
+            border-radius: 6px;
+
+            HorizontalLayout {
+                padding: 10px;
+                spacing: 10px;
+                alignment: start;
+
+                Image {
+                    source: @image-url("assets/check.svg");
+                    colorize: Colors.green;
+                    width: 16px;
+                    height: 16px;
+                }
+
+                Text {
+                    text: "リサイズに成功しました";
+                    vertical-alignment: center;
+                    color: Colors.darkgreen;
+                }
+            }
+        }
+
+        // 幅指定
+        HorizontalLayout {
+            spacing: 10px;
+            alignment: start;
+
+            SpinBox {
+                minimum: 1;
+                maximum: 3840;
+                value <=> root.new-canvas-width;
+                edited(value) => {
+                    if root.current-canvas-width > 0 {
+                        root.new-canvas-height = Math.max(1, Math.round(value * root.current-canvas-height / root.current-canvas-width));
+                    }
+                }
+            }
+
+            Text {
+                text: "幅 (px)";
+                vertical-alignment: center;
+            }
+        }
+
+        // 高さ指定
+        HorizontalLayout {
+            spacing: 10px;
+            alignment: start;
+
+            SpinBox {
+                minimum: 1;
+                maximum: 2160;
+                value <=> root.new-canvas-height;
+                edited(value) => {
+                    if root.current-canvas-height > 0 {
+                        root.new-canvas-width = Math.max(1, Math.round(value * root.current-canvas-width / root.current-canvas-height));
+                    }
+                }
+            }
+
+            Text {
+                text: "高さ (px)";
+                vertical-alignment: center;
+            }
+        }
+
+        // 補間方式
+        HorizontalLayout {
+            spacing: 10px;
+            alignment: start;
+
+            ComboBox {
+                model: ["Nearest", "Triangle", "CatmullRom", "Gaussian", "Lanczos3"];
+                current-index <=> root.filter-type-index;
+            }
+
+            Text {
+                text: "補間方式";
+                vertical-alignment: center;
+            }
+        }
+
+        // サイズ表示
+        HorizontalLayout {
+            spacing: 10px;
+            alignment: start;
+
+            Text {
+                text: current-canvas-width + " x " + current-canvas-height;
+            }
+
+            Text {
+                text: "→";
+            }
+
+            Text {
+                text: root.new-canvas-width + " x " + root.new-canvas-height;
+                color: Palette.accent-background;
+            }
+        }
+
+        // OK / Cancel
+        HorizontalLayout {
+            alignment: end;
+            padding-top: 10px;
+            spacing: 10px;
+
+            if root.state == CanvasResizeState.form || root.state == CanvasResizeState.success: Button {
+                text: "OK";
+                primary: true;
+                enabled: root.new-canvas-width > 0 && root.new-canvas-height > 0;
+                clicked => {
+                    root.start-canvas-resize();
+                }
+            }
+
+            if root.state == CanvasResizeState.processing: Spinner {
+                indeterminate: true;
+            }
+
+            Button {
+                text: "Cancel";
+                enabled: root.state == CanvasResizeState.form || root.state == CanvasResizeState.success;
+                clicked => {
+                    root.cancel();
+                }
+            }
+        }
+    }
+}

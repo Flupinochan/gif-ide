@@ -17,6 +17,7 @@ image = { version = "0.25.10", default-features = false, features = [
     "webp",
 ] }
 raw-window-handle = "0.6.2"
+rayon = "1.12.0"
 rfd = "0.17.2"
 slint = { version = "1.16.1", features = ["raw-window-handle-06"] }
 tokio = { version = "1.52.3", features = ["rt-multi-thread"] }

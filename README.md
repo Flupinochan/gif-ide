@@ -165,6 +165,18 @@ GIFではcanvasでleft, top分ズラして画像がされているため、コ�
 | blur                       | ぼかし               |
 | filter3x3                  | 3x3 カーネルフィルタ |
 
+##### FilterType (imageops::resize の補間方式)
+
+| FilterType | 補間方式                | 画質                         | 速度 (参考値)    |
+| ---------- | ----------------------- | ---------------------------- | ---------------- |
+| Nearest    | 最近傍法                | 最も低い (ジャギー)          | 最速 (約31ms)    |
+| Triangle   | 線形補間 (Bilinear相当) | やや良い、若干ぼやける       | 速い (約414ms)   |
+| CatmullRom | 三次補間 (Bicubic相当)  | 良い、エッジが比較的シャープ | 中程度 (約817ms) |
+| Gaussian   | ガウシアンフィルタ      | 高品質だがやや柔らかい       | 遅い (約1180ms)  |
+| Lanczos3   | Lanczos法 (窓幅3)       | 最も高品質、シャープ         | 遅い (約1170ms)  |
+
+このプロジェクトではキャンバスリサイズ時にFilterTypeをUIから選択可能にしている (デフォルト: Lanczos3)
+
 ### JPEG
 
 PNG, JPEGなどのFormatは、Pixel (RGBA) をBytesとしてシリアライズ、圧縮する規格

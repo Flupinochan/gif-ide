@@ -13,6 +13,7 @@ export { MessageDialog } from "message-dialog.slint";
 export { ExportFileWindow } from "export-file-window.slint";
 export { ImportFileWindow } from "import-file-window.slint";
 export { EditFrameDropWindow, FramePreview, FrameDropState } from "edit-frame-drop-window.slint";
+export { EditCanvasResizeWindow, CanvasResizeState } from "edit-canvas-resize-window.slint";
 // ThemeはWindowごとに保有されるため、ExportしてDialogを開く際にThemeを必ず渡す
 export { Palette } from "std-widgets.slint";
 
@@ -39,6 +40,7 @@ export component AppWindow inherits Window {
     callback apply-delay-to-all(int);
     callback frame-delay-changed(int, float);
     callback edit-frame-drop;
+    callback edit-canvas-resize;
 
     title: "GIF IDE";
     default-font-family: Style.font-family;
@@ -497,6 +499,15 @@ export component AppWindow inherits Window {
                             font-size: 13px;
                             font-weight: FontWeight.medium;
                             color: Palette.foreground.transparentize(0.3);
+                        }
+
+                        // キャンバスリサイズ
+                        Button {
+                            text: "キャンバスをリサイズ";
+                            enabled: !is-play && frames.length > 0;
+                            clicked => {
+                                root.edit-canvas-resize();
+                            }
                         }
 
                         // 間引く

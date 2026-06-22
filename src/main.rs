@@ -2,6 +2,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod app_window;
+mod edit_canvas_resize_window;
 mod edit_frame_drop_window;
 mod export_window;
 mod ffmpeg;
@@ -25,6 +26,7 @@ fn main() -> Result<()> {
     let export_window = ExportFileWindow::new()?;
     let import_window = ImportFileWindow::new()?;
     let edit_frame_drop_window = EditFrameDropWindow::new()?;
+    let edit_canvas_resize_window = EditCanvasResizeWindow::new()?;
 
     let gif_file_ref: Rc<RefCell<Option<GifFile>>> = Rc::new(RefCell::new(None));
 
@@ -32,6 +34,7 @@ fn main() -> Result<()> {
     import_window::register_callbacks(&ui, &import_window, &gif_file_ref);
     export_window::register_callbacks(&ui, &export_window, &gif_file_ref);
     edit_frame_drop_window::register_callbacks(&ui, &edit_frame_drop_window, &gif_file_ref);
+    edit_canvas_resize_window::register_callbacks(&ui, &edit_canvas_resize_window, &gif_file_ref);
 
     ui.run()?;
 

@@ -1612,6 +1612,7 @@ dependencies = [
  "gif",
  "image",
  "raw-window-handle",
+ "rayon",
  "rfd",
  "slint",
  "slint-build",
