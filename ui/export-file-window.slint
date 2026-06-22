@@ -24,6 +24,7 @@ export component ExportFileWindow inherits Window {
     out property <bool> is-gif: format-index == 0;
     out property <bool> is-jpeg: format-index == 2;
     in-out property <bool> gif-loop-forever: true;
+    in-out property <bool> gif-optimize: false;
     in-out property <int> range-index: 0;
     in-out property <float> quality: 100;
     in property <ExportState> state: ExportState.form;
@@ -153,6 +154,13 @@ export component ExportFileWindow inherits Window {
                 checked: gif-loop-forever;
                 toggled => {
                     gif-loop-forever = !gif-loop-forever;
+                }
+            }
+            Switch {
+                text: "サイズ最適化 (不透明な内容のみ効果あり)";
+                checked: gif-optimize;
+                toggled => {
+                    gif-optimize = !gif-optimize;
                 }
             }
         }

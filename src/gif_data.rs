@@ -168,6 +168,97 @@ impl GifFile {
         Ok(())
     }
 
+    // ffmpegのpaletteuse(diff_mode=rectangle)で差分矩形のみ出力し、ファイルサイズを抑えるGIFエクスポート
+    pub fn export_optimized(&self, path: &Path, loop_forever: bool, delays: &[u16]) -> Result<()> {
+        let w = self.canvas_width;
+        let h = self.canvas_height;
+
+        let temp_dir = std::env::temp_dir().join(format!("gif_ide_export_{}", std::process::id()));
+        std::fs::create_dir_all(&temp_dir)?;
+
+        let mut canvas = vec![0u8; w as usize * h as usize * 4];
+        let mut manifest = String::new();
+
+        for (index, (frame, &delay)) in self.frames.iter().zip(delays).enumerate() {
+            let prev_canvas = if frame.dispose == gif::DisposalMethod::Previous {
+                Some(canvas.clone())
+            } else {
+                None
+            };
+
+            // Frame作成
+            for row in 0..frame.height as usize {
+                for col in 0..frame.width as usize {
+                    let src = (row * frame.width as usize + col) * 4;
+                    let dst =
+                        ((frame.top as usize + row) * w as usize + frame.left as usize + col) * 4;
+                    if frame.pixels[src + 3] > 0 {
+                        canvas[dst..dst + 4].copy_from_slice(&frame.pixels[src..src + 4]);
+                    }
+                }
+            }
+
+            // 1フレームにつき1回だけPNGとして一時ファイルに書き出し、manifestに実際のdelayを記録する
+            let frame_name = format!("frame_{index:05}.png");
+            image::save_buffer_with_format(
+                temp_dir.join(&frame_name),
+                &canvas,
+                w as u32,
+                h as u32,
+                image::ColorType::Rgba8,
+                image::ImageFormat::Png,
+            )?;
+            let duration_secs = delay.max(1) as f64 / 100.0;
+            // ffmpeg concat用のmanifest fileを作成
+            // fileとdurationのsyntaxを指定したファイル
+            manifest.push_str(&format!(
+                "file '{frame_name}'\nduration {duration_secs:.6}\n"
+            ));
+
+            // 後処理
+            match frame.dispose {
+                // canvasを0でfillして透明化
+                gif::DisposalMethod::Background => {
+                    for row in 0..frame.height as usize {
+                        for col in 0..frame.width as usize {
+                            let dst = ((frame.top as usize + row) * w as usize
+                                + frame.left as usize
+                                + col)
+                                * 4;
+                            canvas[dst..dst + 4].fill(0);
+                        }
+                    }
+                }
+                // 前フレームの状態に戻す
+                gif::DisposalMethod::Previous => {
+                    canvas = prev_canvas.unwrap();
+                }
+                _ => {}
+            }
+        }
+
+        let manifest_path = temp_dir.join("manifest.txt");
+        std::fs::write(&manifest_path, manifest)?;
+
+        // ffmpeg gif muxerは各フレームのdelayを次フレームとのPTS差分から算出するため、
+        // 最後のフレームだけは-final_delayで明示的に指定する必要がある
+        let final_delay = delays.last().copied().unwrap_or(1).max(1);
+
+        let ffmpeg = Ffmpeg::new()?;
+        let child = ffmpeg.spawn_gif_encoder(&manifest_path, loop_forever, final_delay, path)?;
+        let output = child.wait_with_output()?;
+
+        let _ = std::fs::remove_dir_all(&temp_dir);
+
+        if !output.status.success() {
+            return Err(anyhow::anyhow!(
+                "ffmpegによるGIF出力に失敗しました: {}",
+                String::from_utf8_lossy(&output.stderr)
+            ));
+        }
+        Ok(())
+    }
+
     pub fn retain_frames(&mut self, interval: i32, start_index: i32) {
         let mut idx: i32 = 0;
         self.frames.retain(|_| {

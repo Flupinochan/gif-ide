@@ -19,7 +19,7 @@ impl Ffmpeg {
     pub(crate) fn get_video_metadata(&self, path: &Path) -> Result<VideoMetadata> {
         let output = Command::new(&self.ffprobe_path)
             .args([
-                "-v",
+                "-loglevel",
                 "error",
                 "-select_streams",
                 "v:0",
@@ -44,11 +44,46 @@ impl Ffmpeg {
     // ffmpegで動画を生のRGBAフレーム列に変換するプロセスを起動
     pub(crate) fn spawn_raw_frames(&self, path: &Path) -> Result<Child> {
         Ok(Command::new(&self.ffmpeg_path)
-            .args(["-v", "error", "-i"])
+            .args(["-loglevel", "error", "-i"])
             .arg(path)
             .args(["-f", "rawvideo", "-pix_fmt", "rgba", "-"])
             .stdout(Stdio::piped())
             .stderr(Stdio::null())
+            .spawn()?)
+    }
+
+    // concatデマルチプレクサのmanifest (PNG連番+各フレームのduration) を読み込み、
+    // paletteuse(diff_mode=rectangle)で差分矩形のみ出力するGIFとしてエンコードするプロセスを起動
+    pub(crate) fn spawn_gif_encoder(
+        &self,
+        manifest_path: &Path,
+        loop_forever: bool,
+        final_delay: u16,
+        output_path: &Path,
+    ) -> Result<Child> {
+        let loop_value = if loop_forever { "0" } else { "-1" };
+
+        Ok(Command::new(&self.ffmpeg_path)
+            .args(["-loglevel", "error"])
+            .args(["-f", "concat"])
+            .args(["-safe", "0"])
+            .arg("-i")
+            .arg(manifest_path)
+            .args(["-fps_mode", "passthrough"])
+            .args([
+                "-lavfi",
+                "split[a][b];\
+                 [a]palettegen=max_colors=256:reserve_transparent=1:stats_mode=diff[p];\
+                 [b][p]paletteuse=dither=bayer:bayer_scale=5:diff_mode=rectangle",
+            ])
+            .args(["-loop", loop_value])
+            .arg("-final_delay")
+            .arg(final_delay.to_string())
+            .args(["-y"])
+            .arg(output_path)
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::piped())
             .spawn()?)
     }
 }

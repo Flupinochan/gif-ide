@@ -162,6 +162,7 @@ pub(crate) fn register_callbacks(
                 gif: GifFile,
                 loop_forever: bool,
                 delays: Vec<u16>,
+                optimize: bool,
             },
             Image {
                 buffers: Vec<slint::SharedPixelBuffer<slint::Rgba8Pixel>>,
@@ -184,6 +185,7 @@ pub(crate) fn register_callbacks(
                 gif,
                 loop_forever: export_window.get_gif_loop_forever(),
                 delays,
+                optimize: export_window.get_gif_optimize(),
             }
         } else {
             let frames = ui.get_frames();
@@ -221,10 +223,15 @@ pub(crate) fn register_callbacks(
                 gif,
                 loop_forever,
                 delays,
+                optimize,
             } => {
                 slint::spawn_local(async move {
                     let result = tokio::task::spawn_blocking(move || {
-                        gif.export(&path, loop_forever, &delays)
+                        if optimize {
+                            gif.export_optimized(&path, loop_forever, &delays)
+                        } else {
+                            gif.export(&path, loop_forever, &delays)
+                        }
                     })
                     .await
                     .unwrap();
