@@ -91,7 +91,14 @@ impl GifFile {
             }
         }
 
-        child.wait()?;
+        let output = child.wait_with_output()?;
+
+        if !output.status.success() {
+            return Err(anyhow::anyhow!(
+                "ffmpegによるフレーム抽出に失敗しました: {}",
+                String::from_utf8_lossy(&output.stderr)
+            ));
+        }
 
         if frames.is_empty() {
             return Err(anyhow::anyhow!("動画からフレームを取得できませんでした"));

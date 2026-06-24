@@ -75,6 +75,22 @@ disposal は Keep に設定 (NとN+1フレームで比較可能にするため�
 
 disposal は「前フレームをどう処理するか」の指示であり、差分フレームは Keep と組み合わせて初めて意味を持つ
 
+上記自前実装は複雑なため、以下のffmpegで実装することにした
+
+### ffmpeg差分最適化エクスポートの入力方式比較
+
+軽量化そのものを行っているのはffmpeg側 (`diff_mode=rectangle`) であり、ここで比較しているのは「各フレームの可変delayをffmpegにどう渡すか」という入力方式の選択に過ぎない。入力方式自体がファイルサイズを縮小するわけではなく、選び方を誤るとffmpeg側の軽量化効果を阻害する (複製によるオーバーヘッド増加で悪化する) 点に注意
+
+| 手法                                        | 一時ファイル | 軽量化効果への影響                             | 複雑度 | 評価                                                |
+| ------------------------------------------- | ------------ | ---------------------------------------------- | ------ | --------------------------------------------------- |
+| A. concat + 1フレーム1PNG + duration (採用) | 必要         | 阻害しない (実機確認: 元ファイルと同等サイズ)  | 低     | ◎ 採用                                              |
+| B. rawvideo + stdin + フレーム複製 (旧実装) | 不要         | 阻害する (複製により最大7.5倍に悪化、実機確認) | 低     | × 不可                                              |
+| C. image2 + `-ts_from_file` (mtime利用)     | 必要         | 阻害しない (Aと同等)                           | 中     | △ Aより間接的 (mtimeという別目的のメタデータを転用) |
+| D. GCD単位の複製                            | 不要         | 部分的に軽減 (delay同士が互いに素だと効果なし) | 中     | △ 汎用性なし                                        |
+| E. 名前付きパイプ                           | 実質不要     | 阻害しない (Aと同等)                           | 高     | △ 利益が小さい                                      |
+
+なお`diff_mode=rectangle`自体は、不透明なコンテンツに対してのみ前フレームとの差分矩形を縮小する。透過を含むフレームは縮小されないが悪化もしない (実機確認済み)。UI側のスイッチラベルにも「不透明な内容のみ効果あり」と補足している
+
 ## Image
 
 以下のようなデータ構造
@@ -295,3 +311,51 @@ Container, Video, Audioそれぞれに規格があり、組み合わせられて
 MP4でも、H.264 + AAC や H.264 + Opus のようにVideoは同じでもAudioのCodecが異なることがある
 
 そのため、全ての規格に対応させるには、`FFmpeg` を利用することが一般的
+
+## ffmpeg
+
+### トランスコード処理
+
+| 用語                        | 入力                                | 出力                                      | 役割                                                                  |
+| --------------------------- | ----------------------------------- | ----------------------------------------- | --------------------------------------------------------------------- |
+| Demuxer (demultiplexerの略) | コンテナファイル/ストリーム全体     | パケット (圧縮済み、ストリームごとに分離) | コンテナの「箱」を解析し、映像/音声/字幕などのストリームに分解する    |
+| Decoder                     | パケット (圧縮済み)                 | フレーム (生データ)                       | 圧縮されたデータを伸長し、実際のピクセル/音声サンプルに戻す           |
+| Encoder                     | フレーム (生データ)                 | パケット (圧縮済み)                       | 生データを目的のコーデックで圧縮する                                  |
+| Muxer (multiplexerの略)     | パケット (圧縮済み、複数ストリーム) | コンテナファイル/ストリーム全体           | 複数のストリームのパケットを束ね、1つのコンテナファイルとして書き出す |
+
+データの流れ: `demux → decode → (filter等) → encode → mux`
+
+### 参考リンク
+
+- [Generic options](https://ffmpeg.org/ffmpeg.html#Generic-options)
+- [concat](https://ffmpeg.org/ffmpeg-filters.html#concat)
+- [concat manifest file syntax](https://ffmpeg.org/ffmpeg-formats.html#Syntax)
+- [concat options](https://ffmpeg.org/ffmpeg-formats.html#Options)
+- [gif demuxer options](https://ffmpeg.org/ffmpeg-formats.html#gif-1)
+- [gif muxer options](https://ffmpeg.org/ffmpeg-formats.html#gif-2)
+- [ffmpeg format (Demuxers/Muxers)](https://ffmpeg.org/ffmpeg-formats.html)
+- [ffmpeg filter](https://ffmpeg.org/ffmpeg-filters.html)
+  - `-filter_complex (-lavfi)`
+  - `palettegen・paletteuse`
+
+### オプション
+
+```rust
+.args(["-f", "concat"])   // ← -i の前 = 入力オプション
+.args(["-safe", "0"])     // ← -i の前 = 入力オプション
+.arg("-i")
+.arg(manifest_path)
+.args(["-fps_mode", "passthrough"])  // ← -i の後 = 出力オプション
+.args(["-lavfi", "..."])             // ← -i の後 = 出力オプション
+```
+
+### filter_complex の構造 (spawn_gif_encoderの差分出力)
+
+```mermaid
+flowchart LR
+    IN["入力<br/>concat (連番PNG)"] --> SPLIT["split"]
+    SPLIT -->|"[a]"| PALGEN["palettegen<br/>max_colors=256<br/>reserve_transparent=1<br/>stats_mode=diff"]
+    SPLIT -->|"[b]"| PALUSE["paletteuse<br/>dither=bayer:bayer_scale=5<br/>diff_mode=rectangle"]
+    PALGEN -->|"[p]"| PALUSE
+    PALUSE --> OUT["出力 GIF"]
+```

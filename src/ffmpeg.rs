@@ -44,11 +44,15 @@ impl Ffmpeg {
     // ffmpegで動画を生のRGBAフレーム列に変換するプロセスを起動
     pub(crate) fn spawn_raw_frames(&self, path: &Path) -> Result<Child> {
         Ok(Command::new(&self.ffmpeg_path)
-            .args(["-loglevel", "error", "-i"])
+            .args(["-loglevel", "error"])
+            .arg("-i")
             .arg(path)
-            .args(["-f", "rawvideo", "-pix_fmt", "rgba", "-"])
+            .args(["-f", "rawvideo"])
+            .args(["-pix_fmt", "rgba"])
+            .arg("-")
+            .stdin(Stdio::null())
             .stdout(Stdio::piped())
-            .stderr(Stdio::null())
+            .stderr(Stdio::piped())
             .spawn()?)
     }
 
@@ -71,7 +75,7 @@ impl Ffmpeg {
             .arg(manifest_path)
             .args(["-fps_mode", "passthrough"])
             .args([
-                "-lavfi",
+                "-filter_complex",
                 "split[a][b];\
                  [a]palettegen=max_colors=256:reserve_transparent=1:stats_mode=diff[p];\
                  [b][p]paletteuse=dither=bayer:bayer_scale=5:diff_mode=rectangle",
