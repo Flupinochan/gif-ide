@@ -1,6 +1,6 @@
 use crate::gif_data::GifFile;
 use crate::window::show_window;
-use crate::{AppWindow, EditFrameDropWindow, FrameDropState, FramePreview};
+use crate::{AppWindow, EditFrameDropWindow, FramePreview, LoadingState};
 use slint::{ComponentHandle, Model, ModelRc, VecModel};
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -29,7 +29,7 @@ pub(crate) fn register_callbacks(
             .map(|f| FramePreview { image: f.image })
             .collect();
         drop_window.set_frames(ModelRc::from(Rc::new(VecModel::from(preview))));
-        drop_window.set_state(FrameDropState::Form);
+        drop_window.set_state(LoadingState::Form);
 
         show_window!(drop_window, ui);
     });
@@ -61,7 +61,7 @@ pub(crate) fn register_callbacks(
             return;
         };
 
-        drop_window.set_state(FrameDropState::Processing);
+        drop_window.set_state(LoadingState::Processing);
 
         let gif_ref_drop = gif_ref_drop.clone();
         let ui_weak = ui.as_weak();
@@ -86,7 +86,7 @@ pub(crate) fn register_callbacks(
 
             *gif_ref_drop.borrow_mut() = Some(gif);
 
-            drop_window.set_state(FrameDropState::Success);
+            drop_window.set_state(LoadingState::Success);
         })
         .unwrap();
     });

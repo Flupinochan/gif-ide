@@ -1,5 +1,6 @@
-import { ExportFileWindow, ExportState } from "../export-file-window.slint";
+import { ExportFileWindow } from "../export-file-window.slint";
+import { LoadingState } from "../loading-state.slint";
 
 export component ExportFileWindowPreview inherits ExportFileWindow {
-    state: ExportState.processing;
+    state: LoadingState.processing;
 }

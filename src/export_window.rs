@@ -1,6 +1,6 @@
 use crate::gif_data::GifFile;
 use crate::window::{show_message_dialog, show_window};
-use crate::{AppWindow, ExportFileWindow, ExportState};
+use crate::{AppWindow, ExportFileWindow, LoadingState};
 use rfd::AsyncFileDialog;
 use slint::{ComponentHandle, Model, SharedString};
 use std::cell::RefCell;
@@ -216,7 +216,7 @@ pub(crate) fn register_callbacks(
             }
         };
 
-        export_window.set_state(ExportState::Processing);
+        export_window.set_state(LoadingState::Processing);
 
         match job {
             ExportJob::Gif {
@@ -239,7 +239,7 @@ pub(crate) fn register_callbacks(
                     let _ = slint::invoke_from_event_loop(move || match result {
                         Ok(()) => {
                             if let Some(export_window) = export_window_weak_start_export.upgrade() {
-                                export_window.set_state(ExportState::Success);
+                                export_window.set_state(LoadingState::Success);
                             }
                         }
                         Err(e) => {
@@ -305,7 +305,7 @@ pub(crate) fn register_callbacks(
                     let _ = slint::invoke_from_event_loop(move || match result {
                         Ok(()) => {
                             if let Some(export_window) = export_window_weak_start_export.upgrade() {
-                                export_window.set_state(ExportState::Success);
+                                export_window.set_state(LoadingState::Success);
                             }
                         }
                         Err(e) => {
@@ -380,7 +380,7 @@ pub(crate) fn register_callbacks(
             return;
         };
 
-        export_window.set_state(ExportState::Form);
+        export_window.set_state(LoadingState::Form);
         show_window!(export_window, ui);
     });
 }

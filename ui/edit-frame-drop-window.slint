@@ -6,12 +6,7 @@ import {
     Button,
 } from "std-widgets.slint";
 import { Style } from "global-styles.slint";
-
-export enum FrameDropState {
-    form,
-    processing,
-    success,
-}
+import { LoadingState } from "loading-state.slint";
 
 export struct FramePreview {
     image: image,
@@ -22,7 +17,7 @@ export component EditFrameDropWindow inherits Window {
     in-out property <int> frame-drop-interval: 10;
     in-out property <int> frame-drop-start-index: 1;
     in property <[FramePreview]> frames: [];
-    in property <FrameDropState> state: FrameDropState.form;
+    in property <LoadingState> state: LoadingState.form;
     property <int> remaining-frames: current-total-frames - (frame-drop-start-index <= current-total-frames ? Math.floor((current-total-frames - frame-drop-start-index) / frame-drop-interval) + 1 : 0);
     callback start-frame-drop();
     callback cancel();
@@ -35,7 +30,7 @@ export component EditFrameDropWindow inherits Window {
         padding: 16px;
         spacing: 16px;
 
-        if root.state == FrameDropState.success: Rectangle {
+        if root.state == LoadingState.success: Rectangle {
             background: Colors.green.transparentize(0.85);
             border-radius: 6px;
 
@@ -207,7 +202,7 @@ export component EditFrameDropWindow inherits Window {
             padding-top: 10px;
             spacing: 10px;
 
-            if root.state == FrameDropState.form || root.state == FrameDropState.success: Button {
+            if root.state == LoadingState.form || root.state == LoadingState.success: Button {
                 text: "OK";
                 primary: true;
                 enabled: root.remaining-frames > 0;
@@ -216,13 +211,13 @@ export component EditFrameDropWindow inherits Window {
                 }
             }
 
-            if root.state == FrameDropState.processing: Spinner {
+            if root.state == LoadingState.processing: Spinner {
                 indeterminate: true;
             }
 
             Button {
                 text: "Cancel";
-                enabled: root.state == FrameDropState.form || root.state == FrameDropState.success;
+                enabled: root.state == LoadingState.form || root.state == LoadingState.success;
                 clicked => {
                     root.cancel();
                 }

@@ -6,12 +6,7 @@ import {
     ComboBox,
 } from "std-widgets.slint";
 import { Style } from "global-styles.slint";
-
-export enum CanvasResizeState {
-    form,
-    processing,
-    success,
-}
+import { LoadingState } from "loading-state.slint";
 
 export component EditCanvasResizeWindow inherits Window {
     in-out property <int> current-canvas-width;
@@ -19,7 +14,7 @@ export component EditCanvasResizeWindow inherits Window {
     in-out property <int> new-canvas-width: 0;
     in-out property <int> new-canvas-height: 0;
     in-out property <int> filter-type-index: 0;
-    in property <CanvasResizeState> state: CanvasResizeState.form;
+    in property <LoadingState> state: LoadingState.form;
     callback start-canvas-resize();
     callback cancel();
 
@@ -31,7 +26,7 @@ export component EditCanvasResizeWindow inherits Window {
         padding: 16px;
         spacing: 16px;
 
-        if root.state == CanvasResizeState.success: Rectangle {
+        if root.state == LoadingState.success: Rectangle {
             background: Colors.green.transparentize(0.85);
             border-radius: 6px;
 
@@ -140,7 +135,7 @@ export component EditCanvasResizeWindow inherits Window {
             padding-top: 10px;
             spacing: 10px;
 
-            if root.state == CanvasResizeState.form || root.state == CanvasResizeState.success: Button {
+            if root.state == LoadingState.form || root.state == LoadingState.success: Button {
                 text: "OK";
                 primary: true;
                 enabled: root.new-canvas-width > 0 && root.new-canvas-height > 0;
@@ -149,13 +144,13 @@ export component EditCanvasResizeWindow inherits Window {
                 }
             }
 
-            if root.state == CanvasResizeState.processing: Spinner {
+            if root.state == LoadingState.processing: Spinner {
                 indeterminate: true;
             }
 
             Button {
                 text: "Cancel";
-                enabled: root.state == CanvasResizeState.form || root.state == CanvasResizeState.success;
+                enabled: root.state == LoadingState.form || root.state == LoadingState.success;
                 clicked => {
                     root.cancel();
                 }

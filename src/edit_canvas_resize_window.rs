@@ -1,6 +1,6 @@
 use crate::gif_data::GifFile;
 use crate::window::show_window;
-use crate::{AppWindow, CanvasResizeState, EditCanvasResizeWindow};
+use crate::{AppWindow, EditCanvasResizeWindow, LoadingState};
 use slint::{ComponentHandle, ModelRc, VecModel};
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -36,7 +36,7 @@ pub(crate) fn register_callbacks(
         resize_window.set_current_canvas_height(height);
         resize_window.set_new_canvas_width(width);
         resize_window.set_new_canvas_height(height);
-        resize_window.set_state(CanvasResizeState::Form);
+        resize_window.set_state(LoadingState::Form);
 
         show_window!(resize_window, ui);
     });
@@ -69,7 +69,7 @@ pub(crate) fn register_callbacks(
             return;
         };
 
-        resize_window.set_state(CanvasResizeState::Processing);
+        resize_window.set_state(LoadingState::Processing);
 
         let gif_ref_resize = gif_ref_resize.clone();
         let ui_weak = ui.as_weak();
@@ -95,7 +95,7 @@ pub(crate) fn register_callbacks(
 
             *gif_ref_resize.borrow_mut() = Some(resized);
 
-            resize_window.set_state(CanvasResizeState::Success);
+            resize_window.set_state(LoadingState::Success);
         })
         .unwrap();
     });
