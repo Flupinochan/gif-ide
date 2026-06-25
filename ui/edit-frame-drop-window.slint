@@ -24,7 +24,7 @@ export component EditFrameDropWindow inherits Window {
     callback start-frame-drop();
     callback cancel();
 
-    title: "フレームを間引く";
+    title: @tr("フレームを間引く");
     default-font-family: Style.font-family;
     height: self.preferred-height;
 
@@ -49,7 +49,7 @@ export component EditFrameDropWindow inherits Window {
                 }
 
                 Text {
-                    text: "フレームの間引きに成功しました";
+                    text: @tr("フレームの間引きに成功しました");
                     vertical-alignment: center;
                     color: Colors.darkgreen;
                 }
@@ -70,7 +70,7 @@ export component EditFrameDropWindow inherits Window {
 
             HorizontalLayout {
                 Text {
-                    text: " フレームごとに ";
+                    text: @tr(" フレームごとに ", " frames → drop ");
                     vertical-alignment: center;
                 }
 
@@ -82,7 +82,7 @@ export component EditFrameDropWindow inherits Window {
                 }
 
                 Text {
-                    text: " フレームを削除";
+                    text: @tr(" フレームを削除", " frame");
                     vertical-alignment: center;
                 }
             }
@@ -101,7 +101,7 @@ export component EditFrameDropWindow inherits Window {
             }
 
             Text {
-                text: " 番目のフレームから削除開始";
+                text: @tr(" 番目のフレームから削除開始", " (drop starts here)");
                 vertical-alignment: center;
             }
         }

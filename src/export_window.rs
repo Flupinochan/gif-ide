@@ -9,7 +9,10 @@ use std::sync::{Arc, Mutex};
 async fn save_gif_file() -> Option<PathBuf> {
     AsyncFileDialog::new()
         .add_filter("GIF", &["gif"])
-        .set_title("保存先を選択してください")
+        .set_title(crate::i18n::t(
+            "保存先を選択してください",
+            "Select a destination",
+        ))
         .save_file()
         .await
         .map(|handle| handle.path().to_path_buf())
@@ -115,7 +118,10 @@ async fn save_image_file(format_index: i32) -> Option<PathBuf> {
     let (name, ext, _) = IMAGE_FORMATS[format_index as usize];
     AsyncFileDialog::new()
         .add_filter(name, &[ext])
-        .set_title("保存先を選択してください")
+        .set_title(crate::i18n::t(
+            "保存先を選択してください",
+            "Select a destination",
+        ))
         .save_file()
         .await
         .map(|handle| handle.path().to_path_buf())
@@ -259,9 +265,14 @@ pub(crate) fn register_callbacks(
                         }
                         Err(e) => {
                             if let Some(ui) = ui_weak_start_export.upgrade() {
+                                let message = if crate::i18n::is_english() {
+                                    format!("Failed to export GIF: {}", e)
+                                } else {
+                                    format!("GIFの出力に失敗しました: {}", e)
+                                };
                                 show_message_dialog(
-                                    "エラー",
-                                    &format!("GIFの出力に失敗しました: {}", e),
+                                    crate::i18n::t("エラー", "Error"),
+                                    &message,
                                     &ui,
                                 );
                             }
@@ -339,9 +350,14 @@ pub(crate) fn register_callbacks(
                         }
                         Err(e) => {
                             if let Some(ui) = ui_weak_start_export.upgrade() {
+                                let message = if crate::i18n::is_english() {
+                                    format!("Failed to export image: {}", e)
+                                } else {
+                                    format!("画像の出力に失敗しました: {}", e)
+                                };
                                 show_message_dialog(
-                                    "エラー",
-                                    &format!("画像の出力に失敗しました: {}", e),
+                                    crate::i18n::t("エラー", "Error"),
+                                    &message,
                                     &ui,
                                 );
                             }

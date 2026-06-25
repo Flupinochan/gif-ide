@@ -32,7 +32,7 @@ export component ExportFileWindow inherits Window {
 
     // FileDialogと干渉するため設定しないこと
     // always-on-top: true;
-    title: "ファイル出力";
+    title: @tr("ファイル出力");
     default-font-family: Style.font-family;
     height: self.preferred-height;
 
@@ -61,7 +61,7 @@ export component ExportFileWindow inherits Window {
                     }
 
                     Text {
-                        text: "出力に成功しました";
+                        text: @tr("出力に成功しました");
                         vertical-alignment: center;
                         color: Colors.darkgreen;
                     }
@@ -76,7 +76,7 @@ export component ExportFileWindow inherits Window {
                     }
 
                     open-text := Text {
-                        text: "開く";
+                        text: @tr("開く");
                         vertical-alignment: center;
                         color: Palette.accent-background;
                     }
@@ -87,7 +87,7 @@ export component ExportFileWindow inherits Window {
         VerticalLayout {
             spacing: 10px;
             Text {
-                text: "形式";
+                text: @tr("形式");
                 font-size: 14px;
                 font-weight: FontWeight.medium;
                 vertical-alignment: center;
@@ -105,7 +105,7 @@ export component ExportFileWindow inherits Window {
         VerticalLayout {
             spacing: 10px;
             Text {
-                text: "保存先";
+                text: @tr("保存先");
                 font-size: 14px;
                 font-weight: FontWeight.medium;
                 vertical-alignment: center;
@@ -131,14 +131,14 @@ export component ExportFileWindow inherits Window {
         if !root.is-gif: VerticalLayout {
             spacing: 10px;
             Text {
-                text: "範囲";
+                text: @tr("範囲");
                 font-size: 14px;
                 font-weight: FontWeight.medium;
                 vertical-alignment: center;
             }
 
             SelectionGroup {
-                options: ["現在のフレーム", "すべて"];
+                options: [@tr("現在のフレーム"), @tr("すべて")];
                 selected-index <=> root.range-index;
             }
         }
@@ -147,14 +147,14 @@ export component ExportFileWindow inherits Window {
             padding-top: 5px;
             spacing: 10px;
             Switch {
-                text: "ループ";
+                text: @tr("ループ");
                 checked: gif-loop-forever;
                 toggled => {
                     gif-loop-forever = !gif-loop-forever;
                 }
             }
             Switch {
-                text: "サイズ最適化 (不透明な内容のみ効果あり)";
+                text: @tr("サイズ最適化 (不透明な内容のみ効果あり)");
                 checked: gif-optimize;
                 toggled => {
                     gif-optimize = !gif-optimize;
@@ -169,7 +169,7 @@ export component ExportFileWindow inherits Window {
                 alignment: start;
                 spacing: 8px;
                 Text {
-                    text: "品質";
+                    text: @tr("品質");
                     font-size: 14px;
                     font-weight: FontWeight.medium;
                     vertical-alignment: center;

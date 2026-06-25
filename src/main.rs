@@ -7,6 +7,7 @@ mod edit_frame_drop_window;
 mod export_window;
 mod ffmpeg;
 mod gif_data;
+mod i18n;
 mod import_window;
 mod window;
 

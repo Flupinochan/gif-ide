@@ -97,4 +97,20 @@ pub(crate) fn register_callbacks(ui: &AppWindow, gif_file_ref: &Arc<Mutex<Option
             }
         }
     });
+
+    // 言語切替Callback
+    let ui_weak_switch_language = ui.as_weak();
+    ui.on_switch_language(move || {
+        let Some(ui) = ui_weak_switch_language.upgrade() else {
+            return;
+        };
+        let next_lang = if ui.get_current_language() == "en" {
+            "ja"
+        } else {
+            "en"
+        };
+        let _ = slint::select_bundled_translation(next_lang);
+        crate::i18n::IS_ENGLISH.store(next_lang == "en", std::sync::atomic::Ordering::Relaxed);
+        ui.set_current_language(next_lang.into());
+    });
 }
