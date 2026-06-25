@@ -6,6 +6,7 @@ use slint::{Image, Rgba8Pixel, SharedPixelBuffer};
 use std::fs::File;
 use std::io::{BufWriter, ErrorKind, Read};
 use std::path::Path;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 #[derive(Clone)]
 pub struct GifFrame {
@@ -111,7 +112,13 @@ impl GifFile {
         })
     }
 
-    pub fn export(&self, path: &Path, loop_forever: bool, delays: &[u16]) -> Result<()> {
+    pub fn export(
+        &self,
+        path: &Path,
+        loop_forever: bool,
+        delays: &[u16],
+        mut on_progress: Option<&mut dyn FnMut(usize)>,
+    ) -> Result<()> {
         let w = self.canvas_width;
         let h = self.canvas_height;
         let file = BufWriter::new(File::create(path)?);
@@ -125,7 +132,7 @@ impl GifFile {
 
         let mut canvas = vec![0u8; w as usize * h as usize * 4];
 
-        for (frame, &delay) in self.frames.iter().zip(delays) {
+        for (index, (frame, &delay)) in self.frames.iter().zip(delays).enumerate() {
             let prev_canvas = if frame.dispose == gif::DisposalMethod::Previous {
                 Some(canvas.clone())
             } else {
@@ -171,12 +178,22 @@ impl GifFile {
                 // TODO: Keepの場合は前フレームと後フレームを差分比較して最小サイズに
                 _ => {}
             }
+
+            if let Some(cb) = on_progress.as_deref_mut() {
+                cb(index + 1);
+            }
         }
         Ok(())
     }
 
     // ffmpegのpaletteuse(diff_mode=rectangle)で差分矩形のみ出力し、ファイルサイズを抑えるGIFエクスポート
-    pub fn export_optimized(&self, path: &Path, loop_forever: bool, delays: &[u16]) -> Result<()> {
+    pub fn export_optimized(
+        &self,
+        path: &Path,
+        loop_forever: bool,
+        delays: &[u16],
+        mut on_progress: Option<&mut dyn FnMut(usize)>,
+    ) -> Result<()> {
         let w = self.canvas_width;
         let h = self.canvas_height;
 
@@ -242,6 +259,10 @@ impl GifFile {
                 }
                 _ => {}
             }
+
+            if let Some(cb) = on_progress.as_deref_mut() {
+                cb(index + 1);
+            }
         }
 
         let manifest_path = temp_dir.join("manifest.txt");
@@ -266,11 +287,19 @@ impl GifFile {
         Ok(())
     }
 
-    pub fn retain_frames(&mut self, interval: i32, start_index: i32) {
+    pub fn retain_frames(
+        &mut self,
+        interval: i32,
+        start_index: i32,
+        mut on_progress: Option<&mut dyn FnMut(usize)>,
+    ) {
         let mut idx: i32 = 0;
         self.frames.retain(|_| {
             let keep = idx % interval != start_index - 1;
             idx += 1;
+            if let Some(cb) = on_progress.as_deref_mut() {
+                cb(idx as usize);
+            }
             keep
         });
     }
@@ -280,6 +309,7 @@ impl GifFile {
         new_width: u16,
         new_height: u16,
         filter_type: image::imageops::FilterType,
+        progress: Option<&AtomicUsize>,
     ) {
         let scale_x = new_width as f64 / self.canvas_width as f64;
         let scale_y = new_height as f64 / self.canvas_height as f64;
@@ -308,6 +338,10 @@ impl GifFile {
             frame.height = new_frame_height;
             frame.left = new_left;
             frame.top = new_top;
+
+            if let Some(p) = progress {
+                p.fetch_add(1, Ordering::Relaxed);
+            }
         });
 
         self.canvas_width = new_width;
@@ -445,7 +479,12 @@ mod tests {
 
         let mut parallel_gif = gif.clone();
         let start = Instant::now();
-        parallel_gif.resize_canvas(new_width, new_height, image::imageops::FilterType::Lanczos3);
+        parallel_gif.resize_canvas(
+            new_width,
+            new_height,
+            image::imageops::FilterType::Lanczos3,
+            None,
+        );
         println!("並列 (rayon, 並列化後): {:?}", start.elapsed());
     }
 }

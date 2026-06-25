@@ -1,4 +1,4 @@
-use crate::gif_data::GifFile;
+use crate::gif_data::{Gif, GifFile};
 use crate::window::show_window;
 use crate::{AppWindow, EditFrameDropWindow, FramePreview, LoadingState};
 use slint::{ComponentHandle, Model, ModelRc, VecModel};
@@ -63,11 +63,33 @@ pub(crate) fn register_callbacks(
 
         drop_window.set_state(LoadingState::Processing);
 
+        let total = gif.frames().len();
+        drop_window.set_progress_current(0);
+        drop_window.set_progress_total(total as i32);
+
         let gif_ref_drop = gif_ref_drop.clone();
         let ui_weak = ui.as_weak();
         let drop_window_weak = drop_window.as_weak();
+        let drop_window_weak_progress = drop_window.as_weak();
         tokio::task::spawn_blocking(move || {
-            gif.retain_frames(interval, start_index);
+            let step = (total / 100).max(1);
+            let mut last_reported = 0usize;
+            gif.retain_frames(
+                interval,
+                start_index,
+                Some(&mut |n: usize| {
+                    if n != total && n - last_reported < step {
+                        return;
+                    }
+                    last_reported = n;
+                    let drop_window_weak_progress = drop_window_weak_progress.clone();
+                    let _ = slint::invoke_from_event_loop(move || {
+                        if let Some(w) = drop_window_weak_progress.upgrade() {
+                            w.set_progress_current(n as i32);
+                        }
+                    });
+                }),
+            );
 
             let _ = slint::invoke_from_event_loop(move || {
                 let (Some(ui), Some(drop_window)) = (ui_weak.upgrade(), drop_window_weak.upgrade())
