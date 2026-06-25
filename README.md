@@ -371,3 +371,51 @@ UIが固まらないようにするには、重い処理はtokio spawn_blocking�
 | `slint::invoke_from_event_loop` | UIスレッド上             | 別スレッドからUIを更新する                                                                 | ★★★（よく使う）       |
 | `slint::spawn_local`            | UIスレッド上             | UIスレッド上で`async`処理を開始する（Tokioがない場合、画面が固まるため利用すべきではない） | ★☆☆（使わない）       |
 
+#### 基本的なcallback処理の雛形
+
+```rust
+// callback登録前にweak参照を用意 (callback内でムーブするため)
+let ui_weak_some_action = ui.as_weak();
+let window_weak_some_action = window.as_weak();
+let data_ref_some_action = data_ref.clone();
+
+window.on_some_action(move || {
+    // callback自体はUIスレッド上で実行される
+    let (Some(ui), Some(window)) = (ui_weak_some_action.upgrade(), window_weak_some_action.upgrade()) else {
+        return;
+    };
+
+    // UIから入力値を取得
+    let param = window.get_xxx();
+
+    // 業務データを取得
+    let Some(data) = data_ref_some_action.borrow().clone() else {
+        return;
+    };
+
+    // UIスレッド上なので直接setしてよい
+    window.set_state(LoadingState::Processing);
+
+    // 別スレッドに渡すためweakを再取得
+    let ui_weak_inner = ui.as_weak();
+    let window_weak_inner = window.as_weak();
+    let data_ref_inner = data_ref_some_action.clone();
+
+    // 重い処理は別スレッドで実行
+    tokio::task::spawn_blocking(move || {
+        // TODO: 重い処理
+
+        // 結果反映のみUIスレッドへ戻す
+        let _ = slint::invoke_from_event_loop(move || {
+            let (Some(ui), Some(window)) = (ui_weak_inner.upgrade(), window_weak_inner.upgrade()) else {
+                return;
+            };
+
+            // TODO: UI更新
+
+            window.set_state(LoadingState::Success);
+        });
+    });
+});
+```
+
