@@ -144,14 +144,18 @@ pub(crate) fn register_callbacks(
                         apply_gif_file_to_ui(&ui, &gif_file, filename);
                     }
                     Err(e) => {
-                        let message = if crate::i18n::is_english() {
-                            let label = if format_index == 0 { "GIF" } else { "video" };
-                            format!("Failed to load {label}: {e}")
-                        } else {
-                            let label = if format_index == 0 { "GIF" } else { "動画" };
-                            format!("{label}の読み込みに失敗しました: {e}")
-                        };
-                        show_message_dialog(crate::i18n::t("エラー", "Error"), &message, &ui);
+                        let label = crate::i18n::t(
+                            if format_index == 0 { "GIF" } else { "動画" },
+                            if format_index == 0 { "GIF" } else { "video" },
+                        );
+                        show_message_dialog(
+                            crate::i18n::error_title(),
+                            crate::i18n::t(
+                                &format!("{label}の読み込みに失敗しました: {e}"),
+                                &format!("Failed to load {label}: {e}"),
+                            ),
+                            &ui,
+                        );
                     }
                 }
             });

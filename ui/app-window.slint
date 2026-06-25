@@ -73,9 +73,7 @@ export component AppWindow inherits Window {
                     alignment: center;
 
                     Button {
-                        // TODO: 専用の言語切替アイコンが用意できたら差し替える
-                        icon: current-language == "en" ? @image-url("assets/sun.svg") : @image-url("assets/moon.svg");
-                        colorize-icon: true;
+                        text: current-language == "en" ? "JA" : "EN";
                         clicked => {
                             root.switch-language();
                         }

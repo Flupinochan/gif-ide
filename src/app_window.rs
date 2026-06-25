@@ -109,8 +109,9 @@ pub(crate) fn register_callbacks(ui: &AppWindow, gif_file_ref: &Arc<Mutex<Option
         } else {
             "en"
         };
-        let _ = slint::select_bundled_translation(next_lang);
-        crate::i18n::IS_ENGLISH.store(next_lang == "en", std::sync::atomic::Ordering::Relaxed);
-        ui.set_current_language(next_lang.into());
+        if slint::select_bundled_translation(next_lang).is_ok() {
+            crate::i18n::IS_ENGLISH.store(next_lang == "en", std::sync::atomic::Ordering::Relaxed);
+            ui.set_current_language(next_lang.into());
+        }
     });
 }

@@ -97,7 +97,7 @@ msgid "フレームの間引きに成功しました"
 msgstr "Frame drop succeeded"
 
 msgid " フレームごとに "
-msgstr " frames → drop "
+msgstr " frames: drop "
 
 msgid " フレームを削除"
 msgstr " frame"

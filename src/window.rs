@@ -60,4 +60,4 @@ pub(crate) fn focus_window(window: &slint::Window) {
 }
 
 #[cfg(not(windows))]
-fn focus_window(_window: &slint::Window) {}
+pub(crate) fn focus_window(_window: &slint::Window) {}
