@@ -35,6 +35,30 @@ export component EditFrameDropWindow inherits Window {
         padding: 16px;
         spacing: 16px;
 
+        if root.state == FrameDropState.success: Rectangle {
+            background: Colors.green.transparentize(0.85);
+            border-radius: 6px;
+
+            HorizontalLayout {
+                padding: 10px;
+                spacing: 10px;
+                alignment: start;
+
+                Image {
+                    source: @image-url("assets/check.svg");
+                    colorize: Colors.green;
+                    width: 16px;
+                    height: 16px;
+                }
+
+                Text {
+                    text: "フレームの間引きに成功しました";
+                    vertical-alignment: center;
+                    color: Colors.darkgreen;
+                }
+            }
+        }
+
         // interval 指定
         HorizontalLayout {
             spacing: 10px;
