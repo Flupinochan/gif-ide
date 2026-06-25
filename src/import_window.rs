@@ -10,7 +10,7 @@ use std::sync::{Arc, Mutex};
 async fn import_file() -> Option<PathBuf> {
     AsyncFileDialog::new()
         .add_filter("GIF", &["gif"])
-        .set_title("GIFを選択してください")
+        .set_title(crate::i18n::t("GIFを選択してください", "Select a GIF file"))
         .pick_file()
         .await
         .map(|handle| handle.path().to_path_buf())
@@ -24,7 +24,10 @@ async fn import_video_file() -> Option<PathBuf> {
                 "mp4", "m4v", "mov", "3gp", "3g2", "avi", "mkv", "webm", "wmv", "flv", "ogv",
             ],
         )
-        .set_title("動画を選択してください")
+        .set_title(crate::i18n::t(
+            "動画を選択してください",
+            "Select a video file",
+        ))
         .pick_file()
         .await
         .map(|handle| handle.path().to_path_buf())
@@ -141,10 +144,16 @@ pub(crate) fn register_callbacks(
                         apply_gif_file_to_ui(&ui, &gif_file, filename);
                     }
                     Err(e) => {
-                        let label = if format_index == 0 { "GIF" } else { "動画" };
+                        let label = crate::i18n::t(
+                            if format_index == 0 { "GIF" } else { "動画" },
+                            if format_index == 0 { "GIF" } else { "video" },
+                        );
                         show_message_dialog(
-                            "エラー",
-                            &format!("{label}の読み込みに失敗しました: {e}"),
+                            crate::i18n::error_title(),
+                            crate::i18n::t(
+                                &format!("{label}の読み込みに失敗しました: {e}"),
+                                &format!("Failed to load {label}: {e}"),
+                            ),
                             &ui,
                         );
                     }

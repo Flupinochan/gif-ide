@@ -7,6 +7,7 @@ mod edit_frame_drop_window;
 mod export_window;
 mod ffmpeg;
 mod gif_data;
+mod i18n;
 mod import_window;
 mod window;
 
@@ -22,6 +23,11 @@ fn main() -> Result<()> {
     let _guard = rt.enter();
 
     let ui = AppWindow::new()?;
+    let _ = slint::select_bundled_translation(ui.get_current_language().as_str());
+    crate::i18n::IS_ENGLISH.store(
+        ui.get_current_language() == "en",
+        std::sync::atomic::Ordering::Relaxed,
+    );
     let export_window = ExportFileWindow::new()?;
     let import_window = ImportFileWindow::new()?;
     let edit_frame_drop_window = EditFrameDropWindow::new()?;

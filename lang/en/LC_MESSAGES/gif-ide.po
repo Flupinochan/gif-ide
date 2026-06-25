@@ -1,0 +1,106 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: gif-ide\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Language: en\n"
+
+msgid "ファイル選択"
+msgstr "Select file"
+
+msgid "delay一括適用"
+msgstr "Apply delay to all"
+
+msgid "GIF 情報"
+msgstr "GIF Info"
+
+msgid "ファイル名"
+msgstr "Filename"
+
+msgid "総フレーム数"
+msgstr "Total frames"
+
+msgid "サイズ"
+msgstr "Size"
+
+msgid "編集"
+msgstr "Edit"
+
+msgid "キャンバスをリサイズ"
+msgstr "Resize canvas"
+
+msgid "フレームを間引く"
+msgstr "Drop frames"
+
+msgid "入力/出力"
+msgstr "Import/Export"
+
+msgid "出力"
+msgstr "Export"
+
+msgid "ファイル読み込み"
+msgstr "File Import"
+
+msgid "形式"
+msgstr "Format"
+
+msgid "読み込み元"
+msgstr "Source"
+
+msgid "ファイル出力"
+msgstr "File Export"
+
+msgid "出力に成功しました"
+msgstr "Export succeeded"
+
+msgid "開く"
+msgstr "Open"
+
+msgid "保存先"
+msgstr "Destination"
+
+msgid "範囲"
+msgstr "Range"
+
+msgid "現在のフレーム"
+msgstr "Current frame"
+
+msgid "すべて"
+msgstr "All"
+
+msgid "ループ"
+msgstr "Loop"
+
+msgid "サイズ最適化 (不透明な内容のみ効果あり)"
+msgstr "Optimize size (opaque content only)"
+
+msgid "品質"
+msgstr "Quality"
+
+msgid "キャンバスサイズを変更"
+msgstr "Change Canvas Size"
+
+msgid "リサイズに成功しました"
+msgstr "Resize succeeded"
+
+msgid "幅 (px)"
+msgstr "Width (px)"
+
+msgid "高さ (px)"
+msgstr "Height (px)"
+
+msgid "補間方式"
+msgstr "Interpolation method"
+
+msgid "フレームの間引きに成功しました"
+msgstr "Frame drop succeeded"
+
+msgid " フレームごとに "
+msgstr " frames: drop "
+
+msgid " フレームを削除"
+msgstr " frame"
+
+msgid " 番目のフレームから削除開始"
+msgstr " (drop starts here)"

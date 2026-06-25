@@ -35,6 +35,7 @@ export component AppWindow inherits Window {
     in property <int> gif-canvas-width: 0;
     in property <int> gif-canvas-height: 0;
     in-out property <length> sidebar-width: 200px;
+    in property <string> current-language: "ja";
     callback import-file();
     callback export-file();
     callback play(int);
@@ -42,6 +43,7 @@ export component AppWindow inherits Window {
     callback frame-delay-changed(int, float);
     callback edit-frame-drop;
     callback edit-canvas-resize;
+    callback switch-language();
 
     title: "GIF IDE";
     default-font-family: Style.font-family;
@@ -63,18 +65,33 @@ export component AppWindow inherits Window {
                 }
             }
 
-            // Theme Button
-            VerticalLayout {
-                alignment: center;
+            // Language & Theme Buttons
+            HorizontalLayout {
+                spacing: 8px;
 
-                Button {
-                    icon: Palette.color-scheme == ColorScheme.dark ? @image-url("assets/sun.svg") : @image-url("assets/moon.svg");
-                    colorize-icon: true;
-                    clicked => {
-                        if (Palette.color-scheme == ColorScheme.dark) {
-                            Palette.color-scheme = ColorScheme.light;
-                        } else {
-                            Palette.color-scheme = ColorScheme.dark;
+                VerticalLayout {
+                    alignment: center;
+
+                    Button {
+                        text: current-language == "en" ? "JA" : "EN";
+                        clicked => {
+                            root.switch-language();
+                        }
+                    }
+                }
+
+                VerticalLayout {
+                    alignment: center;
+
+                    Button {
+                        icon: Palette.color-scheme == ColorScheme.dark ? @image-url("assets/sun.svg") : @image-url("assets/moon.svg");
+                        colorize-icon: true;
+                        clicked => {
+                            if (Palette.color-scheme == ColorScheme.dark) {
+                                Palette.color-scheme = ColorScheme.light;
+                            } else {
+                                Palette.color-scheme = ColorScheme.dark;
+                            }
                         }
                     }
                 }
@@ -95,7 +112,7 @@ export component AppWindow inherits Window {
                     padding: 12px;
 
                     if !is-loading && frames.length == 0: Button {
-                        text: "ファイル選択";
+                        text: @tr("ファイル選択");
                         clicked => root.import-file();
                     }
 
@@ -264,7 +281,7 @@ export component AppWindow inherits Window {
                             }
 
                             apply-delay := Button {
-                                text: "delay一括適用";
+                                text: @tr("delay一括適用");
                                 enabled: !is-play;
                                 clicked => {
                                     bulk-delay-input.clear-focus();
@@ -425,7 +442,7 @@ export component AppWindow inherits Window {
 
                         // 小見出し
                         Text {
-                            text: "GIF 情報";
+                            text: @tr("GIF 情報");
                             font-size: 13px;
                             font-weight: FontWeight.medium;
                             color: Palette.foreground.transparentize(0.3);
@@ -436,7 +453,7 @@ export component AppWindow inherits Window {
                             alignment: space-between;
 
                             Text {
-                                text: "ファイル名";
+                                text: @tr("ファイル名");
                                 color: Palette.foreground.transparentize(0.5);
                                 vertical-alignment: center;
                             }
@@ -453,7 +470,7 @@ export component AppWindow inherits Window {
                             alignment: space-between;
 
                             Text {
-                                text: "総フレーム数";
+                                text: @tr("総フレーム数");
                                 color: Palette.foreground.transparentize(0.5);
                                 vertical-alignment: center;
                             }
@@ -470,7 +487,7 @@ export component AppWindow inherits Window {
                             alignment: space-between;
 
                             Text {
-                                text: "サイズ";
+                                text: @tr("サイズ");
                                 color: Palette.foreground.transparentize(0.5);
                                 vertical-alignment: center;
                             }
@@ -496,7 +513,7 @@ export component AppWindow inherits Window {
 
                         // 小見出し
                         Text {
-                            text: "編集";
+                            text: @tr("編集");
                             font-size: 13px;
                             font-weight: FontWeight.medium;
                             color: Palette.foreground.transparentize(0.3);
@@ -504,7 +521,7 @@ export component AppWindow inherits Window {
 
                         // キャンバスリサイズ
                         Button {
-                            text: "キャンバスをリサイズ";
+                            text: @tr("キャンバスをリサイズ");
                             enabled: !is-play && frames.length > 0;
                             clicked => {
                                 root.edit-canvas-resize();
@@ -513,7 +530,7 @@ export component AppWindow inherits Window {
 
                         // 間引く
                         Button {
-                            text: "フレームを間引く";
+                            text: @tr("フレームを間引く");
                             enabled: !is-play && frames.length > 0;
                             clicked => {
                                 root.edit-frame-drop();
@@ -534,14 +551,14 @@ export component AppWindow inherits Window {
 
                         // 小見出し
                         Text {
-                            text: "入力/出力";
+                            text: @tr("入力/出力");
                             font-size: 13px;
                             font-weight: FontWeight.medium;
                             color: Palette.foreground.transparentize(0.3);
                         }
 
                         Button {
-                            text: "ファイル選択";
+                            text: @tr("ファイル選択");
                             enabled: !is-play;
                             clicked => {
                                 root.import-file();
@@ -549,7 +566,7 @@ export component AppWindow inherits Window {
                         }
 
                         Button {
-                            text: "出力";
+                            text: @tr("出力");
                             primary: true;
                             enabled: !is-play && frames.length > 0;
                             clicked => {
