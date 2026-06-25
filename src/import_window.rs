@@ -3,9 +3,9 @@ use crate::window::{show_message_dialog, show_window};
 use crate::{AppWindow, ImportFileWindow};
 use rfd::AsyncFileDialog;
 use slint::{ComponentHandle, ModelRc, SharedString, VecModel};
-use std::cell::RefCell;
 use std::path::PathBuf;
 use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 
 async fn import_file() -> Option<PathBuf> {
     AsyncFileDialog::new()
@@ -54,7 +54,7 @@ fn apply_gif_file_to_ui(ui: &AppWindow, gif_file: &GifFile, filename: String) {
 pub(crate) fn register_callbacks(
     ui: &AppWindow,
     import_window: &ImportFileWindow,
-    gif_file_ref: &Rc<RefCell<Option<GifFile>>>,
+    gif_file_ref: &Arc<Mutex<Option<GifFile>>>,
 ) {
     // 読み込みウィンドウ表示Callback
     let ui_weak_import_file = ui.as_weak();
@@ -79,7 +79,7 @@ pub(crate) fn register_callbacks(
 
         let format_index = import_window.get_format_index();
         let import_window_weak_select_import_path = import_window.as_weak();
-        slint::spawn_local(async move {
+        tokio::spawn(async move {
             let path = if format_index == 0 {
                 import_file().await
             } else {
@@ -95,8 +95,7 @@ pub(crate) fn register_callbacks(
                         .set_import_path(SharedString::from(path.to_string_lossy().into_owned()));
                 }
             });
-        })
-        .unwrap();
+        });
     });
 
     // 読み込み実行Callback
@@ -124,37 +123,34 @@ pub(crate) fn register_callbacks(
 
         let ui_weak_start_import = ui.as_weak();
         let gif_ref = gif_ref_import.clone();
-        slint::spawn_local(async move {
-            let result = tokio::task::spawn_blocking(move || {
-                if format_index == 0 {
-                    GifFile::new(&path_buf)
-                } else {
-                    GifFile::from_video(&path_buf)
-                }
-            })
-            .await
-            .unwrap();
-
-            let Some(ui) = ui_weak_start_import.upgrade() else {
-                return;
+        tokio::task::spawn_blocking(move || {
+            let result = if format_index == 0 {
+                GifFile::new(&path_buf)
+            } else {
+                GifFile::from_video(&path_buf)
             };
-            ui.set_is_loading(false);
-            match result {
-                Ok(gif_file) => {
-                    *gif_ref.borrow_mut() = Some(gif_file.clone());
-                    apply_gif_file_to_ui(&ui, &gif_file, filename);
+
+            let _ = slint::invoke_from_event_loop(move || {
+                let Some(ui) = ui_weak_start_import.upgrade() else {
+                    return;
+                };
+                ui.set_is_loading(false);
+                match result {
+                    Ok(gif_file) => {
+                        *gif_ref.lock().unwrap() = Some(gif_file.clone());
+                        apply_gif_file_to_ui(&ui, &gif_file, filename);
+                    }
+                    Err(e) => {
+                        let label = if format_index == 0 { "GIF" } else { "動画" };
+                        show_message_dialog(
+                            "エラー",
+                            &format!("{label}の読み込みに失敗しました: {e}"),
+                            &ui,
+                        );
+                    }
                 }
-                Err(e) => {
-                    let label = if format_index == 0 { "GIF" } else { "動画" };
-                    show_message_dialog(
-                        "エラー",
-                        &format!("{label}の読み込みに失敗しました: {e}"),
-                        &ui,
-                    );
-                }
-            }
-        })
-        .unwrap();
+            });
+        });
     });
 
     // 読み込みウィンドウCancel Callback

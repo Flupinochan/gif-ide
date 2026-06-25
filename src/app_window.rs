@@ -1,8 +1,7 @@
 use crate::gif_data::GifFile;
 use crate::AppWindow;
 use slint::{ComponentHandle, Model, Timer};
-use std::cell::RefCell;
-use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 
 // 再帰処理で再生機能を実装
 fn schedule_next_frame(ui_weak: slint::Weak<AppWindow>, frame_idx: usize) {
@@ -36,7 +35,7 @@ fn schedule_next_frame(ui_weak: slint::Weak<AppWindow>, frame_idx: usize) {
     });
 }
 
-pub(crate) fn register_callbacks(ui: &AppWindow, gif_file_ref: &Rc<RefCell<Option<GifFile>>>) {
+pub(crate) fn register_callbacks(ui: &AppWindow, gif_file_ref: &Arc<Mutex<Option<GifFile>>>) {
     // 毎回ownershipをmove
     // move対象はブロックで使用している変数のみ
     // EventListener内の参照ではスコープの管理が難しいため、upgradeする (参照できる場合のみ処理する) 方法で対応
@@ -72,7 +71,7 @@ pub(crate) fn register_callbacks(ui: &AppWindow, gif_file_ref: &Rc<RefCell<Optio
             }
         }
 
-        if let Some(gif) = gif_ref_bulk_delay.borrow_mut().as_mut() {
+        if let Some(gif) = gif_ref_bulk_delay.lock().unwrap().as_mut() {
             for raw_frame in gif.frames_mut() {
                 raw_frame.delay = delay.clamp(0, u16::MAX as i32) as u16;
             }
@@ -92,7 +91,7 @@ pub(crate) fn register_callbacks(ui: &AppWindow, gif_file_ref: &Rc<RefCell<Optio
             frames.set_row_data(index as usize, frame);
         }
 
-        if let Some(gif) = gif_ref_delay.borrow_mut().as_mut() {
+        if let Some(gif) = gif_ref_delay.lock().unwrap().as_mut() {
             if let Some(raw_frame) = gif.frames_mut().get_mut(index as usize) {
                 raw_frame.delay = delay.clamp(0.0, u16::MAX as f32) as u16;
             }
