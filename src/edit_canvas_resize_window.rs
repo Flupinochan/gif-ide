@@ -2,8 +2,8 @@ use crate::gif_data::GifFile;
 use crate::window::show_window;
 use crate::{AppWindow, EditCanvasResizeWindow, LoadingState};
 use slint::{ComponentHandle, ModelRc, VecModel};
-use std::cell::RefCell;
 use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 
 // EditCanvasResizeWindowのfilter-type-indexと対応
 const FILTER_TYPES: [image::imageops::FilterType; 5] = [
@@ -17,7 +17,7 @@ const FILTER_TYPES: [image::imageops::FilterType; 5] = [
 pub(crate) fn register_callbacks(
     ui: &AppWindow,
     edit_canvas_resize_window: &EditCanvasResizeWindow,
-    gif_file_ref: &Rc<RefCell<Option<GifFile>>>,
+    gif_file_ref: &Arc<Mutex<Option<GifFile>>>,
 ) {
     // 表示 Callback
     let ui_weak_edit_canvas_resize = ui.as_weak();
@@ -65,7 +65,7 @@ pub(crate) fn register_callbacks(
         let new_height = resize_window.get_new_canvas_height();
         let filter_type = FILTER_TYPES[resize_window.get_filter_type_index() as usize];
 
-        let Some(gif) = gif_ref_resize.borrow().clone() else {
+        let Some(mut gif) = gif_ref_resize.lock().unwrap().clone() else {
             return;
         };
 
@@ -74,29 +74,25 @@ pub(crate) fn register_callbacks(
         let gif_ref_resize = gif_ref_resize.clone();
         let ui_weak = ui.as_weak();
         let resize_window_weak = resize_window.as_weak();
-        slint::spawn_local(async move {
-            let resized = tokio::task::spawn_blocking(move || {
-                let mut gif = gif;
-                gif.resize_canvas(new_width as u16, new_height as u16, filter_type);
-                gif
-            })
-            .await
-            .unwrap();
+        tokio::task::spawn_blocking(move || {
+            gif.resize_canvas(new_width as u16, new_height as u16, filter_type);
 
-            let (Some(ui), Some(resize_window)) = (ui_weak.upgrade(), resize_window_weak.upgrade())
-            else {
-                return;
-            };
+            let _ = slint::invoke_from_event_loop(move || {
+                let (Some(ui), Some(resize_window)) =
+                    (ui_weak.upgrade(), resize_window_weak.upgrade())
+                else {
+                    return;
+                };
 
-            let frame_data = resized.build_frame_data();
-            ui.set_frames(ModelRc::from(Rc::new(VecModel::from(frame_data))));
-            ui.set_gif_canvas_width(new_width);
-            ui.set_gif_canvas_height(new_height);
+                let frame_data = gif.build_frame_data();
+                ui.set_frames(ModelRc::from(Rc::new(VecModel::from(frame_data))));
+                ui.set_gif_canvas_width(new_width);
+                ui.set_gif_canvas_height(new_height);
 
-            *gif_ref_resize.borrow_mut() = Some(resized);
+                *gif_ref_resize.lock().unwrap() = Some(gif);
 
-            resize_window.set_state(LoadingState::Success);
-        })
-        .unwrap();
+                resize_window.set_state(LoadingState::Success);
+            });
+        });
     });
 }

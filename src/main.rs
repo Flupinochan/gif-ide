@@ -11,8 +11,7 @@ mod import_window;
 mod window;
 
 use anyhow::Result;
-use std::cell::RefCell;
-use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 
 use crate::gif_data::GifFile;
 
@@ -28,7 +27,7 @@ fn main() -> Result<()> {
     let edit_frame_drop_window = EditFrameDropWindow::new()?;
     let edit_canvas_resize_window = EditCanvasResizeWindow::new()?;
 
-    let gif_file_ref: Rc<RefCell<Option<GifFile>>> = Rc::new(RefCell::new(None));
+    let gif_file_ref: Arc<Mutex<Option<GifFile>>> = Arc::new(Mutex::new(None));
 
     app_window::register_callbacks(&ui, &gif_file_ref);
     import_window::register_callbacks(&ui, &import_window, &gif_file_ref);

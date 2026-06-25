@@ -2,13 +2,13 @@ use crate::gif_data::GifFile;
 use crate::window::show_window;
 use crate::{AppWindow, EditFrameDropWindow, FramePreview, LoadingState};
 use slint::{ComponentHandle, Model, ModelRc, VecModel};
-use std::cell::RefCell;
 use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 
 pub(crate) fn register_callbacks(
     ui: &AppWindow,
     edit_frame_drop_window: &EditFrameDropWindow,
-    gif_file_ref: &Rc<RefCell<Option<GifFile>>>,
+    gif_file_ref: &Arc<Mutex<Option<GifFile>>>,
 ) {
     // フレーム間引きウィンドウ表示Callback
     let ui_weak_edit_frame_drop = ui.as_weak();
@@ -57,7 +57,7 @@ pub(crate) fn register_callbacks(
         let interval = drop_window.get_frame_drop_interval();
         let start_index = drop_window.get_frame_drop_start_index();
 
-        let Some(mut gif) = gif_ref_drop.borrow().clone() else {
+        let Some(mut gif) = gif_ref_drop.lock().unwrap().clone() else {
             return;
         };
 
@@ -66,28 +66,24 @@ pub(crate) fn register_callbacks(
         let gif_ref_drop = gif_ref_drop.clone();
         let ui_weak = ui.as_weak();
         let drop_window_weak = drop_window.as_weak();
-        slint::spawn_local(async move {
-            let gif = tokio::task::spawn_blocking(move || {
-                gif.retain_frames(interval, start_index);
-                gif
-            })
-            .await
-            .unwrap();
+        tokio::task::spawn_blocking(move || {
+            gif.retain_frames(interval, start_index);
 
-            let (Some(ui), Some(drop_window)) = (ui_weak.upgrade(), drop_window_weak.upgrade())
-            else {
-                return;
-            };
+            let _ = slint::invoke_from_event_loop(move || {
+                let (Some(ui), Some(drop_window)) = (ui_weak.upgrade(), drop_window_weak.upgrade())
+                else {
+                    return;
+                };
 
-            let frame_data = gif.build_frame_data();
-            let new_len = frame_data.len() as i32;
-            ui.set_frames(ModelRc::from(Rc::new(VecModel::from(frame_data))));
-            ui.set_selected_frame_index(ui.get_selected_frame_index().clamp(0, new_len - 1));
+                let frame_data = gif.build_frame_data();
+                let new_len = frame_data.len() as i32;
+                ui.set_frames(ModelRc::from(Rc::new(VecModel::from(frame_data))));
+                ui.set_selected_frame_index(ui.get_selected_frame_index().clamp(0, new_len - 1));
 
-            *gif_ref_drop.borrow_mut() = Some(gif);
+                *gif_ref_drop.lock().unwrap() = Some(gif);
 
-            drop_window.set_state(LoadingState::Success);
-        })
-        .unwrap();
+                drop_window.set_state(LoadingState::Success);
+            });
+        });
     });
 }

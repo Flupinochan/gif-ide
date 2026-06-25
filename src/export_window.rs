@@ -3,9 +3,8 @@ use crate::window::{show_message_dialog, show_window};
 use crate::{AppWindow, ExportFileWindow, LoadingState};
 use rfd::AsyncFileDialog;
 use slint::{ComponentHandle, Model, SharedString};
-use std::cell::RefCell;
 use std::path::{Path, PathBuf};
-use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 
 async fn save_gif_file() -> Option<PathBuf> {
     AsyncFileDialog::new()
@@ -139,7 +138,7 @@ fn open_in_explorer(_path: &std::path::Path) {}
 pub(crate) fn register_callbacks(
     ui: &AppWindow,
     export_window: &ExportFileWindow,
-    gif_file_ref: &Rc<RefCell<Option<GifFile>>>,
+    gif_file_ref: &Arc<Mutex<Option<GifFile>>>,
 ) {
     // 出力ウィンドウCallback
     let ui_weak_start_export = ui.as_weak();
@@ -173,7 +172,7 @@ pub(crate) fn register_callbacks(
         }
 
         let job = if export_window.get_is_gif() {
-            let Some(gif) = gif_ref_ok.borrow().clone() else {
+            let Some(gif) = gif_ref_ok.lock().unwrap().clone() else {
                 return;
             };
             let frames = ui.get_frames();
@@ -225,16 +224,12 @@ pub(crate) fn register_callbacks(
                 delays,
                 optimize,
             } => {
-                slint::spawn_local(async move {
-                    let result = tokio::task::spawn_blocking(move || {
-                        if optimize {
-                            gif.export_optimized(&path, loop_forever, &delays)
-                        } else {
-                            gif.export(&path, loop_forever, &delays)
-                        }
-                    })
-                    .await
-                    .unwrap();
+                tokio::task::spawn_blocking(move || {
+                    let result = if optimize {
+                        gif.export_optimized(&path, loop_forever, &delays)
+                    } else {
+                        gif.export(&path, loop_forever, &delays)
+                    };
 
                     let _ = slint::invoke_from_event_loop(move || match result {
                         Ok(()) => {
@@ -252,8 +247,7 @@ pub(crate) fn register_callbacks(
                             }
                         }
                     });
-                })
-                .unwrap();
+                });
             }
             ExportJob::Image {
                 buffers,
@@ -261,7 +255,7 @@ pub(crate) fn register_callbacks(
                 is_jpeg,
                 quality,
             } => {
-                slint::spawn_local(async move {
+                tokio::spawn(async move {
                     let total = buffers.len();
                     let parallelism = std::thread::available_parallelism()
                         .map(|n| n.get())
@@ -318,8 +312,7 @@ pub(crate) fn register_callbacks(
                             }
                         }
                     });
-                })
-                .unwrap();
+                });
             }
         }
     });
@@ -349,7 +342,7 @@ pub(crate) fn register_callbacks(
         let format_index = export_window.get_format_index();
         let is_gif = export_window.get_is_gif();
         let export_window_weak_select_export_path = export_window.as_weak();
-        slint::spawn_local(async move {
+        tokio::spawn(async move {
             let path = if is_gif {
                 save_gif_file().await
             } else {
@@ -365,8 +358,7 @@ pub(crate) fn register_callbacks(
                         .set_export_path(SharedString::from(path.to_string_lossy().into_owned()));
                 }
             });
-        })
-        .unwrap();
+        });
     });
 
     // 画像出力Callback
