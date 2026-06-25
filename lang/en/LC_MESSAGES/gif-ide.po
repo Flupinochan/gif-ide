@@ -6,101 +6,142 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Language: en\n"
 
+msgctxt "AppWindow"
 msgid "ファイル選択"
 msgstr "Select file"
 
+msgctxt "AppWindow"
 msgid "delay一括適用"
 msgstr "Apply delay to all"
 
+msgctxt "AppWindow"
 msgid "GIF 情報"
 msgstr "GIF Info"
 
+msgctxt "AppWindow"
 msgid "ファイル名"
 msgstr "Filename"
 
+msgctxt "AppWindow"
 msgid "総フレーム数"
 msgstr "Total frames"
 
+msgctxt "AppWindow"
 msgid "サイズ"
 msgstr "Size"
 
+msgctxt "AppWindow"
 msgid "編集"
 msgstr "Edit"
 
+msgctxt "AppWindow"
 msgid "キャンバスをリサイズ"
 msgstr "Resize canvas"
 
+msgctxt "AppWindow"
 msgid "フレームを間引く"
 msgstr "Drop frames"
 
+msgctxt "AppWindow"
 msgid "入力/出力"
 msgstr "Import/Export"
 
+msgctxt "AppWindow"
 msgid "出力"
 msgstr "Export"
 
-msgid "ファイル読み込み"
-msgstr "File Import"
-
-msgid "形式"
-msgstr "Format"
-
-msgid "読み込み元"
-msgstr "Source"
-
-msgid "ファイル出力"
-msgstr "File Export"
-
-msgid "出力に成功しました"
-msgstr "Export succeeded"
-
-msgid "開く"
-msgstr "Open"
-
-msgid "保存先"
-msgstr "Destination"
-
-msgid "範囲"
-msgstr "Range"
-
-msgid "現在のフレーム"
-msgstr "Current frame"
-
-msgid "すべて"
-msgstr "All"
-
-msgid "ループ"
-msgstr "Loop"
-
-msgid "サイズ最適化 (不透明な内容のみ効果あり)"
-msgstr "Optimize size (opaque content only)"
-
-msgid "品質"
-msgstr "Quality"
-
+msgctxt "EditCanvasResizeWindow"
 msgid "キャンバスサイズを変更"
 msgstr "Change Canvas Size"
 
+msgctxt "EditCanvasResizeWindow"
 msgid "リサイズに成功しました"
 msgstr "Resize succeeded"
 
+msgctxt "EditCanvasResizeWindow"
 msgid "幅 (px)"
 msgstr "Width (px)"
 
+msgctxt "EditCanvasResizeWindow"
 msgid "高さ (px)"
 msgstr "Height (px)"
 
+msgctxt "EditCanvasResizeWindow"
 msgid "補間方式"
 msgstr "Interpolation method"
 
+msgctxt "EditFrameDropWindow"
+msgid "フレームを間引く"
+msgstr "Drop frames"
+
+msgctxt "EditFrameDropWindow"
 msgid "フレームの間引きに成功しました"
 msgstr "Frame drop succeeded"
 
+msgctxt "EditFrameDropWindow"
 msgid " フレームごとに "
 msgstr " frames: drop "
 
+msgctxt "EditFrameDropWindow"
 msgid " フレームを削除"
 msgstr " frame"
 
+msgctxt "EditFrameDropWindow"
 msgid " 番目のフレームから削除開始"
 msgstr " (drop starts here)"
+
+msgctxt "ExportFileWindow"
+msgid "ファイル出力"
+msgstr "File Export"
+
+msgctxt "ExportFileWindow"
+msgid "出力に成功しました"
+msgstr "Export succeeded"
+
+msgctxt "ExportFileWindow"
+msgid "開く"
+msgstr "Open"
+
+msgctxt "ExportFileWindow"
+msgid "形式"
+msgstr "Format"
+
+msgctxt "ExportFileWindow"
+msgid "保存先"
+msgstr "Destination"
+
+msgctxt "ExportFileWindow"
+msgid "範囲"
+msgstr "Range"
+
+msgctxt "ExportFileWindow"
+msgid "現在のフレーム"
+msgstr "Current frame"
+
+msgctxt "ExportFileWindow"
+msgid "すべて"
+msgstr "All"
+
+msgctxt "ExportFileWindow"
+msgid "ループ"
+msgstr "Loop"
+
+msgctxt "ExportFileWindow"
+msgid "サイズ最適化 (不透明な内容のみ効果あり)"
+msgstr "Optimize size (opaque content only)"
+
+msgctxt "ExportFileWindow"
+msgid "品質"
+msgstr "Quality"
+
+msgctxt "ImportFileWindow"
+msgid "ファイル読み込み"
+msgstr "File Import"
+
+msgctxt "ImportFileWindow"
+msgid "形式"
+msgstr "Format"
+
+msgctxt "ImportFileWindow"
+msgid "読み込み元"
+msgstr "Source"
