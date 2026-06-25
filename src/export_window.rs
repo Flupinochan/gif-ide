@@ -1,4 +1,4 @@
-use crate::gif_data::GifFile;
+use crate::gif_data::{Gif, GifFile};
 use crate::window::{show_message_dialog, show_window};
 use crate::{AppWindow, ExportFileWindow, LoadingState};
 use rfd::AsyncFileDialog;
@@ -224,11 +224,31 @@ pub(crate) fn register_callbacks(
                 delays,
                 optimize,
             } => {
+                let total = gif.frames().len();
+                export_window.set_progress_current(0);
+                export_window.set_progress_total(total as i32);
+
+                let export_window_weak_progress = export_window.as_weak();
                 tokio::task::spawn_blocking(move || {
+                    let step = (total / 100).max(1);
+                    let mut last_reported = 0usize;
+                    let mut on_progress = move |n: usize| {
+                        if n != total && n - last_reported < step {
+                            return;
+                        }
+                        last_reported = n;
+                        let export_window_weak_progress = export_window_weak_progress.clone();
+                        let _ = slint::invoke_from_event_loop(move || {
+                            if let Some(w) = export_window_weak_progress.upgrade() {
+                                w.set_progress_current(n as i32);
+                            }
+                        });
+                    };
+
                     let result = if optimize {
-                        gif.export_optimized(&path, loop_forever, &delays)
+                        gif.export_optimized(&path, loop_forever, &delays, Some(&mut on_progress))
                     } else {
-                        gif.export(&path, loop_forever, &delays)
+                        gif.export(&path, loop_forever, &delays, Some(&mut on_progress))
                     };
 
                     let _ = slint::invoke_from_event_loop(move || match result {
@@ -255,8 +275,12 @@ pub(crate) fn register_callbacks(
                 is_jpeg,
                 quality,
             } => {
+                let total = buffers.len();
+                export_window.set_progress_current(0);
+                export_window.set_progress_total(total as i32);
+
+                let export_window_weak_progress = export_window.as_weak();
                 tokio::spawn(async move {
-                    let total = buffers.len();
                     let parallelism = std::thread::available_parallelism()
                         .map(|n| n.get())
                         .unwrap_or(1);
@@ -276,18 +300,29 @@ pub(crate) fn register_callbacks(
                         );
                     }
 
+                    let mut completed = 0usize;
                     let mut result: image::ImageResult<()> = Ok(());
                     while let Some(join_result) = set.join_next().await {
                         match join_result.unwrap() {
-                            Ok(()) => spawn_next_encode_task(
-                                &mut set,
-                                &mut next_index,
-                                &buffers,
-                                &path,
-                                format,
-                                is_jpeg,
-                                quality,
-                            ),
+                            Ok(()) => {
+                                completed += 1;
+                                let export_window_weak_progress =
+                                    export_window_weak_progress.clone();
+                                let _ = slint::invoke_from_event_loop(move || {
+                                    if let Some(w) = export_window_weak_progress.upgrade() {
+                                        w.set_progress_current(completed as i32);
+                                    }
+                                });
+                                spawn_next_encode_task(
+                                    &mut set,
+                                    &mut next_index,
+                                    &buffers,
+                                    &path,
+                                    format,
+                                    is_jpeg,
+                                    quality,
+                                )
+                            }
                             Err(e) => {
                                 if result.is_ok() {
                                     result = Err(e);

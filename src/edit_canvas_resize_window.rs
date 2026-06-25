@@ -1,8 +1,9 @@
-use crate::gif_data::GifFile;
+use crate::gif_data::{Gif, GifFile};
 use crate::window::show_window;
 use crate::{AppWindow, EditCanvasResizeWindow, LoadingState};
 use slint::{ComponentHandle, ModelRc, VecModel};
 use std::rc::Rc;
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
 // EditCanvasResizeWindowのfilter-type-indexと対応
@@ -71,11 +72,41 @@ pub(crate) fn register_callbacks(
 
         resize_window.set_state(LoadingState::Processing);
 
+        let total = gif.frames().len();
+        resize_window.set_progress_current(0);
+        resize_window.set_progress_total(total as i32);
+
+        let progress = Arc::new(AtomicUsize::new(0));
+        let done = Arc::new(AtomicBool::new(false));
+
+        let progress_watch = progress.clone();
+        let done_watch = done.clone();
+        let resize_window_weak_progress = resize_window.as_weak();
+        std::thread::spawn(move || {
+            while !done_watch.load(Ordering::Relaxed) {
+                let n = progress_watch.load(Ordering::Relaxed) as i32;
+                let resize_window_weak_progress = resize_window_weak_progress.clone();
+                let _ = slint::invoke_from_event_loop(move || {
+                    if let Some(w) = resize_window_weak_progress.upgrade() {
+                        w.set_progress_current(n);
+                    }
+                });
+                // TODO: 更新間隔は好みで調整 (現在50ms)
+                std::thread::sleep(std::time::Duration::from_millis(50));
+            }
+        });
+
         let gif_ref_resize = gif_ref_resize.clone();
         let ui_weak = ui.as_weak();
         let resize_window_weak = resize_window.as_weak();
         tokio::task::spawn_blocking(move || {
-            gif.resize_canvas(new_width as u16, new_height as u16, filter_type);
+            gif.resize_canvas(
+                new_width as u16,
+                new_height as u16,
+                filter_type,
+                Some(&progress),
+            );
+            done.store(true, Ordering::Relaxed);
 
             let _ = slint::invoke_from_event_loop(move || {
                 let (Some(ui), Some(resize_window)) =
@@ -91,6 +122,7 @@ pub(crate) fn register_callbacks(
 
                 *gif_ref_resize.lock().unwrap() = Some(gif);
 
+                resize_window.set_progress_current(total as i32);
                 resize_window.set_state(LoadingState::Success);
             });
         });

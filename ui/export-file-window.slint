@@ -23,6 +23,8 @@ export component ExportFileWindow inherits Window {
     in-out property <int> range-index: 0;
     in-out property <float> quality: 100;
     in property <LoadingState> state: LoadingState.form;
+    in property <int> progress-current: 0;
+    in property <int> progress-total: 0;
     callback select-export-path();
     callback start-export();
     callback cancel();
@@ -214,8 +216,15 @@ export component ExportFileWindow inherits Window {
                 }
             }
 
-            if root.state == LoadingState.processing: Spinner {
-                indeterminate: true;
+            if root.state == LoadingState.processing: HorizontalLayout {
+                spacing: 8px;
+                Spinner {
+                    indeterminate: true;
+                }
+                if root.progress-total > 0: Text {
+                    text: root.progress-current + " / " + root.progress-total;
+                    vertical-alignment: center;
+                }
             }
 
             Button {
