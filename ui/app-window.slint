@@ -2,7 +2,6 @@ import {
     Button,
     Spinner,
     Palette,
-    Slider,
     ScrollView,
     AboutSlint,
     LineEdit,
@@ -30,7 +29,6 @@ export component AppWindow inherits Window {
     in property <bool> is-loading: false;
     in-out property <bool> is-play: false;
     in-out property <bool> is-repeat: true;
-    in property <string> total-duration: "00:00";
     in property <string> filename: "";
     in property <int> gif-canvas-width: 0;
     in property <int> gif-canvas-height: 0;
@@ -136,95 +134,82 @@ export component AppWindow inherits Window {
                     }
 
                     HorizontalLayout {
+                        alignment: center;
                         padding: 12px;
                         spacing: 12px;
 
-                        HorizontalLayout {
+                        VerticalLayout {
                             alignment: center;
-                            spacing: 12px;
-
-                            VerticalLayout {
-                                alignment: center;
-                                Button {
-                                    icon: @image-url("assets/skip-back.svg");
-                                    colorize-icon: true;
-                                    enabled: frames.length > 0;
-                                    clicked => {
-                                        let prev = selected-frame-index - 1;
-                                        root.selected-frame-index = prev < 0 ? frames.length - 1 : prev;
-                                    }
-                                }
-                            }
-
-                            VerticalLayout {
-                                alignment: center;
-                                Button {
-                                    icon: is-play ? @image-url("assets/stop.svg") : @image-url("assets/play.svg");
-                                    colorize-icon: true;
-                                    primary: true;
-                                    enabled: frames.length > 0;
-                                    clicked => {
-                                        is-play = !is-play;
-                                        root.play(selected-frame-index);
-                                    }
-                                }
-                            }
-
-                            VerticalLayout {
-                                alignment: center;
-                                Button {
-                                    icon: @image-url("assets/skip-forward.svg");
-                                    colorize-icon: true;
-                                    enabled: frames.length > 0;
-                                    clicked => {
-                                        let next = selected-frame-index + 1;
-                                        root.selected-frame-index = next >= frames.length ? 0 : next;
-                                    }
-                                }
-                            }
-
-                            VerticalLayout {
-                                alignment: center;
-                                Button {
-                                    icon: @image-url("assets/repeat.svg");
-                                    colorize-icon: true;
-                                    primary: is-repeat;
-                                    clicked => {
-                                        is-repeat = !is-repeat;
-                                    }
+                            Button {
+                                icon: @image-url("assets/skip-back.svg");
+                                colorize-icon: true;
+                                enabled: frames.length > 0;
+                                clicked => {
+                                    root.selected-frame-index = 0;
                                 }
                             }
                         }
 
-                        Slider {
-                            enabled: frames.length > 0;
+                        VerticalLayout {
+                            alignment: center;
+                            Button {
+                                icon: @image-url("assets/step-back.svg");
+                                colorize-icon: true;
+                                enabled: frames.length > 0;
+                                clicked => {
+                                    let prev = selected-frame-index - 1;
+                                    root.selected-frame-index = prev < 0 ? frames.length - 1 : prev;
+                                }
+                            }
                         }
 
-                        HorizontalLayout {
+                        VerticalLayout {
                             alignment: center;
-                            spacing: 8px;
-
-                            VerticalLayout {
-                                alignment: center;
-                                Text {
-                                    text: "00:00";
-                                    font-size: 14px;
+                            Button {
+                                icon: is-play ? @image-url("assets/stop.svg") : @image-url("assets/play.svg");
+                                colorize-icon: true;
+                                primary: true;
+                                enabled: frames.length > 0;
+                                clicked => {
+                                    is-play = !is-play;
+                                    root.play(selected-frame-index);
                                 }
                             }
+                        }
 
-                            VerticalLayout {
-                                alignment: center;
-                                Text {
-                                    text: "/";
-                                    font-size: 14px;
+                        VerticalLayout {
+                            alignment: center;
+                            Button {
+                                icon: @image-url("assets/step-forward.svg");
+                                colorize-icon: true;
+                                enabled: frames.length > 0;
+                                clicked => {
+                                    let next = selected-frame-index + 1;
+                                    root.selected-frame-index = next >= frames.length ? 0 : next;
                                 }
                             }
+                        }
 
-                            VerticalLayout {
-                                alignment: center;
-                                Text {
-                                    text: total-duration;
-                                    font-size: 14px;
+                        VerticalLayout {
+                            alignment: center;
+                            Button {
+                                icon: @image-url("assets/skip-forward.svg");
+                                colorize-icon: true;
+                                enabled: frames.length > 0;
+                                clicked => {
+                                    root.selected-frame-index = frames.length - 1;
+                                }
+                            }
+                        }
+
+                        VerticalLayout {
+                            alignment: center;
+                            Button {
+                                icon: @image-url("assets/repeat.svg");
+                                colorize-icon: true;
+                                primary: is-repeat;
+                                clicked => {
+                                    is-repeat = !is-repeat;
                                 }
                             }
                         }

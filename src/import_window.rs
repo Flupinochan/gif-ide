@@ -1,4 +1,4 @@
-use crate::gif_data::{frame_data_from_buffers, Gif, GifFile};
+use crate::gif_data::{frame_data_from_buffers, GifFile};
 use crate::window::{show_message_dialog, show_window};
 use crate::{AppWindow, ImportFileWindow};
 use rfd::AsyncFileDialog;
@@ -41,16 +41,6 @@ fn apply_gif_file_to_ui(
     filename: String,
     frame_buffers: Vec<(SharedPixelBuffer<Rgba8Pixel>, i32)>,
 ) {
-    // 再生時間更新
-    let total_duration_cs: u32 = gif_file
-        .frames()
-        .iter()
-        .map(|frame| frame.delay as u32)
-        .sum();
-    let total_seconds = total_duration_cs / 100;
-    let formatted = format!("{:02}:{:02}", total_seconds / 60, total_seconds % 60);
-    ui.set_total_duration(SharedString::from(formatted));
-
     // フレームタイムライン更新
     let frames_model = Rc::new(VecModel::from(frame_data_from_buffers(frame_buffers)));
     ui.set_frames(ModelRc::from(frames_model));
