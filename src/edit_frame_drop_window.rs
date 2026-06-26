@@ -1,4 +1,4 @@
-use crate::gif_data::{Gif, GifFile};
+use crate::gif_data::{frame_data_from_buffers, Gif, GifFile};
 use crate::window::show_window;
 use crate::{AppWindow, EditFrameDropWindow, FramePreview, LoadingState};
 use slint::{ComponentHandle, Model, ModelRc, VecModel};
@@ -57,13 +57,14 @@ pub(crate) fn register_callbacks(
         let interval = drop_window.get_frame_drop_interval();
         let start_index = drop_window.get_frame_drop_start_index();
 
-        let Some(mut gif) = gif_ref_drop.lock().unwrap().clone() else {
+        // UIスレッドで take() と total 取得を原子的に行う (TOCTOU 排除)。
+        // take() は O(1) のポインタ交換のみのため UIスレッドでも問題ない。
+        let Some(mut gif) = gif_ref_drop.lock().unwrap().take() else {
             return;
         };
+        let total = gif.frames().len();
 
         drop_window.set_state(LoadingState::Processing);
-
-        let total = gif.frames().len();
         drop_window.set_progress_current(0);
         drop_window.set_progress_total(total as i32);
 
@@ -91,20 +92,42 @@ pub(crate) fn register_callbacks(
                 }),
             );
 
-            let _ = slint::invoke_from_event_loop(move || {
-                let (Some(ui), Some(drop_window)) = (ui_weak.upgrade(), drop_window_weak.upgrade())
-                else {
-                    return;
-                };
+            // フレームタイムライン用バッファの合成も背景スレッドで完了させる (UIスレッドでは行わない)
+            let buffers = gif.build_frame_buffers();
 
-                let frame_data = gif.build_frame_data();
-                let new_len = frame_data.len() as i32;
-                ui.set_frames(ModelRc::from(Rc::new(VecModel::from(frame_data))));
-                ui.set_selected_frame_index(ui.get_selected_frame_index().clamp(0, new_len - 1));
+            // invoke_from_event_loop の前に gif を返却する。
+            // これにより:
+            // 1. invoke_from_event_loop が Err を返した場合 (イベントループ停止) でも gif が消失しない
+            // 2. ウィンドウが閉じられた場合の早期 return でも gif が消失しない
+            // 3. バッファ構築後にユーザーが delay を編集しても GifFile に書き込まれる
+            *gif_ref_drop.lock().unwrap() = Some(gif);
 
-                *gif_ref_drop.lock().unwrap() = Some(gif);
+            let _ = slint::invoke_from_event_loop({
+                let gif_ref_drop = gif_ref_drop.clone();
+                move || {
+                    let Some(gif) = gif_ref_drop.lock().unwrap().take() else {
+                        return;
+                    };
+                    let (Some(ui), Some(drop_window)) =
+                        (ui_weak.upgrade(), drop_window_weak.upgrade())
+                    else {
+                        // ウィンドウが閉じられた場合でも gif を復元する
+                        *gif_ref_drop.lock().unwrap() = Some(gif);
+                        return;
+                    };
 
-                drop_window.set_state(LoadingState::Success);
+                    let frame_data = frame_data_from_buffers(buffers);
+                    let new_len = frame_data.len() as i32;
+                    ui.set_frames(ModelRc::from(Rc::new(VecModel::from(frame_data))));
+                    if new_len > 0 {
+                        ui.set_selected_frame_index(
+                            ui.get_selected_frame_index().clamp(0, new_len - 1),
+                        );
+                    }
+                    drop_window.set_current_total_frames(new_len);
+                    *gif_ref_drop.lock().unwrap() = Some(gif);
+                    drop_window.set_state(LoadingState::Success);
+                }
             });
         });
     });

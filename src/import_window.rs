@@ -1,8 +1,8 @@
-use crate::gif_data::{Gif, GifFile};
+use crate::gif_data::{frame_data_from_buffers, Gif, GifFile};
 use crate::window::{show_message_dialog, show_window};
 use crate::{AppWindow, ImportFileWindow};
 use rfd::AsyncFileDialog;
-use slint::{ComponentHandle, ModelRc, SharedString, VecModel};
+use slint::{ComponentHandle, ModelRc, Rgba8Pixel, SharedPixelBuffer, SharedString, VecModel};
 use std::path::PathBuf;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
@@ -34,7 +34,13 @@ async fn import_video_file() -> Option<PathBuf> {
 }
 
 // 読み込んだGifFileの内容をUIに反映
-fn apply_gif_file_to_ui(ui: &AppWindow, gif_file: &GifFile, filename: String) {
+// frame_buffersは背景スレッドで合成済みのため、ここではImageへの軽量なラップのみ行う
+fn apply_gif_file_to_ui(
+    ui: &AppWindow,
+    gif_file: &GifFile,
+    filename: String,
+    frame_buffers: Vec<(SharedPixelBuffer<Rgba8Pixel>, i32)>,
+) {
     // 再生時間更新
     let total_duration_cs: u32 = gif_file
         .frames()
@@ -46,7 +52,7 @@ fn apply_gif_file_to_ui(ui: &AppWindow, gif_file: &GifFile, filename: String) {
     ui.set_total_duration(SharedString::from(formatted));
 
     // フレームタイムライン更新
-    let frames_model = Rc::new(VecModel::from(gif_file.build_frame_data()));
+    let frames_model = Rc::new(VecModel::from(frame_data_from_buffers(frame_buffers)));
     ui.set_frames(ModelRc::from(frames_model));
     ui.set_selected_frame_index(0);
     ui.set_filename(SharedString::from(filename));
@@ -131,7 +137,12 @@ pub(crate) fn register_callbacks(
                 GifFile::new(&path_buf)
             } else {
                 GifFile::from_video(&path_buf)
-            };
+            }
+            // フレームタイムライン用バッファの合成も背景スレッドで完了させる (UIスレッドでは行わない)
+            .map(|gif_file| {
+                let buffers = gif_file.build_frame_buffers();
+                (gif_file, buffers)
+            });
 
             let _ = slint::invoke_from_event_loop(move || {
                 let Some(ui) = ui_weak_start_import.upgrade() else {
@@ -139,9 +150,9 @@ pub(crate) fn register_callbacks(
                 };
                 ui.set_is_loading(false);
                 match result {
-                    Ok(gif_file) => {
-                        *gif_ref.lock().unwrap() = Some(gif_file.clone());
-                        apply_gif_file_to_ui(&ui, &gif_file, filename);
+                    Ok((gif_file, buffers)) => {
+                        apply_gif_file_to_ui(&ui, &gif_file, filename, buffers);
+                        *gif_ref.lock().unwrap() = Some(gif_file);
                     }
                     Err(e) => {
                         let label = crate::i18n::t(

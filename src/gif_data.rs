@@ -28,7 +28,6 @@ pub struct GifFile {
 
 pub trait Gif {
     fn frames(&self) -> &[GifFrame];
-    fn frame_image(&self, index: usize) -> Option<Image>;
 }
 
 impl GifFile {
@@ -352,28 +351,10 @@ impl GifFile {
         &mut self.frames
     }
 
-    // 生フレームからUI用モデルを構築
-    pub fn build_frame_data(&self) -> Vec<FrameData> {
-        self.frames()
-            .iter()
-            .enumerate()
-            .filter_map(|(i, f)| {
-                self.frame_image(i).map(|img| FrameData {
-                    image: img,
-                    delay: (f.delay as i32).max(2),
-                })
-            })
-            .collect()
-    }
-}
-
-impl Gif for GifFile {
-    fn frames(&self) -> &[GifFrame] {
-        &self.frames
-    }
-
-    fn frame_image(&self, index: usize) -> Option<Image> {
-        let frame = self.frames.get(index)?;
+    // 1フレーム分をcanvasサイズのバッファに合成。
+    // SharedPixelBufferはSend (slint::ImageはVRcを含み!Sendのため不可) なので、
+    // この結果はバックグラウンドスレッドからUIスレッドへ持ち越せる
+    fn frame_buffer(&self, frame: &GifFrame) -> SharedPixelBuffer<Rgba8Pixel> {
         let w = self.canvas_width as u32;
         let h = self.canvas_height as u32;
         let mut buffer = SharedPixelBuffer::<Rgba8Pixel>::new(w, h);
@@ -385,7 +366,37 @@ impl Gif for GifFile {
                 pixels[dst..dst + 4].copy_from_slice(&frame.pixels[src..src + 4]);
             }
         }
-        Some(Image::from_rgba8(buffer))
+        buffer
+    }
+
+    // 全フレームをSend-safeなバッファ+delayの形で構築する。
+    // slint::Imageをここで生成しないのは、ImageがUIスレッド以外に持ち出せない (!Send) ため。
+    // バックグラウンドスレッドで呼び出し、結果をUIスレッドのframe_data_from_buffersに渡すこと。
+    pub fn build_frame_buffers(&self) -> Vec<(SharedPixelBuffer<Rgba8Pixel>, i32)> {
+        self.frames()
+            .par_iter()
+            .map(|f| (self.frame_buffer(f), (f.delay as i32).max(2)))
+            .collect()
+    }
+}
+
+// build_frame_buffersの結果をUI用のFrameData (Imageを含む) に変換する。
+// slint::Imageは!Sendなので、この関数は必ずUIスレッド (invoke_from_event_loopの中) から呼び出すこと。
+pub fn frame_data_from_buffers(
+    buffers: Vec<(SharedPixelBuffer<Rgba8Pixel>, i32)>,
+) -> Vec<FrameData> {
+    buffers
+        .into_iter()
+        .map(|(buffer, delay)| FrameData {
+            image: Image::from_rgba8(buffer),
+            delay,
+        })
+        .collect()
+}
+
+impl Gif for GifFile {
+    fn frames(&self) -> &[GifFrame] {
+        &self.frames
     }
 }
 

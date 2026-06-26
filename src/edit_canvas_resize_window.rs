@@ -1,4 +1,4 @@
-use crate::gif_data::{Gif, GifFile};
+use crate::gif_data::{frame_data_from_buffers, Gif, GifFile};
 use crate::window::show_window;
 use crate::{AppWindow, EditCanvasResizeWindow, LoadingState};
 use slint::{ComponentHandle, ModelRc, VecModel};
@@ -108,6 +108,8 @@ pub(crate) fn register_callbacks(
             );
             done.store(true, Ordering::Relaxed);
 
+            let buffers = gif.build_frame_buffers();
+
             let _ = slint::invoke_from_event_loop(move || {
                 let (Some(ui), Some(resize_window)) =
                     (ui_weak.upgrade(), resize_window_weak.upgrade())
@@ -115,7 +117,7 @@ pub(crate) fn register_callbacks(
                     return;
                 };
 
-                let frame_data = gif.build_frame_data();
+                let frame_data = frame_data_from_buffers(buffers);
                 ui.set_frames(ModelRc::from(Rc::new(VecModel::from(frame_data))));
                 ui.set_gif_canvas_width(new_width);
                 ui.set_gif_canvas_height(new_height);

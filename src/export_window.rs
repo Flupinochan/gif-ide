@@ -284,9 +284,7 @@ pub(crate) fn register_callbacks(
 
                 let export_window_weak_progress = export_window.as_weak();
                 tokio::spawn(async move {
-                    let parallelism = std::thread::available_parallelism()
-                        .map(|n| n.get())
-                        .unwrap_or(1);
+                    let parallelism = crate::half_parallelism();
 
                     let mut set = tokio::task::JoinSet::new();
                     let mut next_index = 0;
@@ -421,7 +419,6 @@ pub(crate) fn register_callbacks(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::gif_data::Gif;
     use std::time::{Duration, Instant};
 
     // テスト用GIFから全フレームをRGBAバッファとして読み込む
@@ -430,13 +427,10 @@ mod tests {
         let path = std::env::var("TEST_GIF_PATH")
             .expect("環境変数 TEST_GIF_PATH にテスト用GIFファイルのパスを指定してください");
         let gif_file = GifFile::new(Path::new(&path)).expect("GIFファイルの読み込みに失敗");
-        (0..gif_file.frames().len())
-            .map(|i| {
-                gif_file
-                    .frame_image(i)
-                    .and_then(|image| image.to_rgba8())
-                    .expect("フレームの取得に失敗")
-            })
+        gif_file
+            .build_frame_buffers()
+            .into_iter()
+            .map(|(buffer, _delay)| buffer)
             .collect()
     }
 
