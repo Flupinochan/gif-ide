@@ -41,27 +41,81 @@ fn rgba_to_rgb_with_white_background(image: image::RgbaImage) -> image::RgbImage
     rgb
 }
 
-// 1フレーム分のバッファを指定形式でファイルに書き出す
-fn encode_image_buffer(
-    buffer: &slint::SharedPixelBuffer<slint::Rgba8Pixel>,
+// 透明ピクセルを白背景に合成し、完全不透明のバッファへ変換する
+// (透明部分を黒背景に合成して表示するビューア対策のopt-in機能)
+fn composite_on_white(rgba: &mut image::RgbaImage) {
+    for px in rgba.pixels_mut() {
+        let alpha = px[3] as f32 / 255.0;
+        for ch in 0..3 {
+            px[ch] = (px[ch] as f32 * alpha + 255.0 * (1.0 - alpha)).round() as u8;
+        }
+        px[3] = 255;
+    }
+}
+
+// ICOはフォーマット仕様上、幅・高さとも 1..=256 に制限される
+const ICO_MAX_SIZE: u32 = 256;
+
+// 戻り値も(width:u32, height:u32)の順
+fn ico_target_size(width: u32, height: u32) -> (u32, u32) {
+    if width > height {
+        (ICO_MAX_SIZE, (height * ICO_MAX_SIZE / width).max(1))
+    } else {
+        ((width * ICO_MAX_SIZE / height).max(1), ICO_MAX_SIZE)
+    }
+}
+
+// GIF以外の画像出力で全フレーム共通のエンコード設定
+#[derive(Clone, Copy)]
+struct EncodeSettings {
     format: image::ImageFormat,
     is_jpeg: bool,
     quality: u8,
+    ico_filter_type: image::imageops::FilterType,
+    composite_white: bool,
+}
+
+// 1フレーム分のバッファを指定形式でファイルに書き出す
+fn encode_image_buffer(
+    buffer: &slint::SharedPixelBuffer<slint::Rgba8Pixel>,
+    settings: EncodeSettings,
     path: &Path,
 ) -> image::ImageResult<()> {
-    if is_jpeg {
+    if settings.is_jpeg {
         let rgba =
             image::RgbaImage::from_raw(buffer.width(), buffer.height(), buffer.as_bytes().to_vec())
                 .expect("invalid image buffer");
         let rgb = rgba_to_rgb_with_white_background(rgba);
         let writer = std::io::BufWriter::new(std::fs::File::create(path)?);
-        let mut encoder = image::codecs::jpeg::JpegEncoder::new_with_quality(writer, quality);
+        let mut encoder =
+            image::codecs::jpeg::JpegEncoder::new_with_quality(writer, settings.quality);
         encoder.encode(
             rgb.as_raw(),
             rgb.width(),
             rgb.height(),
             image::ExtendedColorType::Rgb8,
         )
+    } else if settings.format == image::ImageFormat::Ico {
+        let mut rgba =
+            image::RgbaImage::from_raw(buffer.width(), buffer.height(), buffer.as_bytes().to_vec())
+                .expect("invalid image buffer");
+        if settings.composite_white {
+            composite_on_white(&mut rgba);
+        }
+        let (width, height) = rgba.dimensions();
+        let rgba = if width > ICO_MAX_SIZE || height > ICO_MAX_SIZE {
+            let (new_width, new_height) = ico_target_size(width, height);
+            image::imageops::resize(&rgba, new_width, new_height, settings.ico_filter_type)
+        } else {
+            rgba
+        };
+        rgba.save_with_format(path, image::ImageFormat::Ico)
+    } else if settings.composite_white {
+        let mut rgba =
+            image::RgbaImage::from_raw(buffer.width(), buffer.height(), buffer.as_bytes().to_vec())
+                .expect("invalid image buffer");
+        composite_on_white(&mut rgba);
+        rgba.save_with_format(path, settings.format)
     } else {
         image::save_buffer_with_format(
             path,
@@ -69,7 +123,7 @@ fn encode_image_buffer(
             buffer.width(),
             buffer.height(),
             image::ColorType::Rgba8,
-            format,
+            settings.format,
         )
     }
 }
@@ -90,9 +144,7 @@ fn spawn_next_encode_task(
     next_index: &mut usize,
     buffers: &[slint::SharedPixelBuffer<slint::Rgba8Pixel>],
     path: &Path,
-    format: image::ImageFormat,
-    is_jpeg: bool,
-    quality: u8,
+    settings: EncodeSettings,
 ) {
     let total = buffers.len();
     if *next_index >= total {
@@ -106,9 +158,7 @@ fn spawn_next_encode_task(
     } else {
         build_indexed_path(path, index, total)
     };
-    set.spawn_blocking(move || {
-        encode_image_buffer(&buffer, format, is_jpeg, quality, &target_path)
-    });
+    set.spawn_blocking(move || encode_image_buffer(&buffer, settings, &target_path));
 }
 
 async fn save_image_file(format_index: i32) -> Option<PathBuf> {
@@ -165,9 +215,7 @@ pub(crate) fn register_callbacks(
             },
             Image {
                 buffers: Vec<slint::SharedPixelBuffer<slint::Rgba8Pixel>>,
-                format: image::ImageFormat,
-                is_jpeg: bool,
-                quality: u8,
+                settings: EncodeSettings,
             },
         }
 
@@ -205,13 +253,17 @@ pub(crate) fn register_callbacks(
 
             let (_, _, format) = IMAGE_FORMATS[export_window.get_format_index() as usize - 1];
 
-            // TODO: ICOは幅・高さとも1..=256の制約があるため、imageops::resizeで
-            // アスペクト比を保ったまま縮小し、ユーザーにサイズ(256/128/64/32など)を選択させる必要がある
+            // TODO: 将来的にICOの出力サイズ(256/128/64/32など)をユーザーが選択できるようにする
             ExportJob::Image {
                 buffers,
-                format,
-                is_jpeg: export_window.get_is_jpeg(),
-                quality: export_window.get_quality() as u8,
+                settings: EncodeSettings {
+                    format,
+                    is_jpeg: export_window.get_is_jpeg(),
+                    quality: export_window.get_quality() as u8,
+                    ico_filter_type: crate::edit_canvas_resize_window::FILTER_TYPES
+                        [export_window.get_ico_filter_type_index() as usize],
+                    composite_white: export_window.get_composite_white_background(),
+                },
             }
         };
 
@@ -272,12 +324,7 @@ pub(crate) fn register_callbacks(
                     });
                 });
             }
-            ExportJob::Image {
-                buffers,
-                format,
-                is_jpeg,
-                quality,
-            } => {
+            ExportJob::Image { buffers, settings } => {
                 let total = buffers.len();
                 export_window.set_progress_current(0);
                 export_window.set_progress_total(total as i32);
@@ -295,9 +342,7 @@ pub(crate) fn register_callbacks(
                             &mut next_index,
                             &buffers,
                             &path,
-                            format,
-                            is_jpeg,
-                            quality,
+                            settings,
                         );
                     }
 
@@ -319,9 +364,7 @@ pub(crate) fn register_callbacks(
                                     &mut next_index,
                                     &buffers,
                                     &path,
-                                    format,
-                                    is_jpeg,
-                                    quality,
+                                    settings,
                                 )
                             }
                             Err(e) => {
@@ -434,6 +477,17 @@ mod tests {
             .collect()
     }
 
+    // ベンチマーク共通のPNG出力設定
+    fn png_settings() -> EncodeSettings {
+        EncodeSettings {
+            format: image::ImageFormat::Png,
+            is_jpeg: false,
+            quality: 100,
+            ico_filter_type: image::imageops::FilterType::Lanczos3,
+            composite_white: false,
+        }
+    }
+
     // 1. 全フレームを1枚ずつ逐次エンコード (並行化なし)
     fn export_sequential(
         buffers: &[slint::SharedPixelBuffer<slint::Rgba8Pixel>],
@@ -443,7 +497,7 @@ mod tests {
         let start = Instant::now();
         for (index, buffer) in buffers.iter().enumerate() {
             let target_path = build_indexed_path(base_path, index, total);
-            encode_image_buffer(buffer, image::ImageFormat::Png, false, 100, &target_path).unwrap();
+            encode_image_buffer(buffer, png_settings(), &target_path).unwrap();
         }
         start.elapsed()
     }
@@ -464,13 +518,7 @@ mod tests {
                     let buffer = buffer.clone();
                     let target_path = build_indexed_path(base_path, index, total);
                     tokio::task::spawn_blocking(move || {
-                        encode_image_buffer(
-                            &buffer,
-                            image::ImageFormat::Png,
-                            false,
-                            100,
-                            &target_path,
-                        )
+                        encode_image_buffer(&buffer, png_settings(), &target_path)
                     })
                 })
                 .collect();
@@ -498,13 +546,7 @@ mod tests {
                         let buffer = buffers[index].clone();
                         let target_path = build_indexed_path(base_path, index, total);
                         tokio::task::spawn_blocking(move || {
-                            encode_image_buffer(
-                                &buffer,
-                                image::ImageFormat::Png,
-                                false,
-                                100,
-                                &target_path,
-                            )
+                            encode_image_buffer(&buffer, png_settings(), &target_path)
                         })
                     })
                     .collect();
@@ -534,9 +576,7 @@ mod tests {
                     &mut next_index,
                     buffers,
                     base_path,
-                    image::ImageFormat::Png,
-                    false,
-                    100,
+                    png_settings(),
                 );
             }
 
@@ -547,9 +587,7 @@ mod tests {
                     &mut next_index,
                     buffers,
                     base_path,
-                    image::ImageFormat::Png,
-                    false,
-                    100,
+                    png_settings(),
                 );
             }
         });

@@ -18,6 +18,9 @@ export component ExportFileWindow inherits Window {
     in-out property <string> export-path: "";
     out property <bool> is-gif: format-index == 0;
     out property <bool> is-jpeg: format-index == 2;
+    out property <bool> is-ico: format-index == 5;
+    in-out property <int> ico-filter-type-index: 0;
+    in-out property <bool> composite-white-background: false;
     in-out property <bool> gif-loop-forever: true;
     in-out property <bool> gif-optimize: false;
     in-out property <int> range-index: 0;
@@ -100,6 +103,13 @@ export component ExportFileWindow inherits Window {
                     root.export-path = "";
                 }
             }
+
+            if root.is-ico: Text {
+                text: @tr("256pxを超える場合は256pxに縮小されます");
+                font-size: 12px;
+                color: Palette.foreground.transparentize(0.4);
+                wrap: word-wrap;
+            }
         }
 
         VerticalLayout {
@@ -140,6 +150,34 @@ export component ExportFileWindow inherits Window {
             SelectionGroup {
                 options: [@tr("現在のフレーム"), @tr("すべて")];
                 selected-index <=> root.range-index;
+            }
+        }
+
+        if root.is-ico: HorizontalLayout {
+            spacing: 10px;
+            alignment: start;
+
+            ComboBox {
+                model: ["Nearest", "Triangle", "CatmullRom", "Gaussian", "Lanczos3"];
+                current-index <=> root.ico-filter-type-index;
+            }
+
+            Text {
+                text: @tr("補間方式");
+                vertical-alignment: center;
+            }
+        }
+
+        // JPEGは常に白背景合成のためスイッチは不要
+        if !root.is-gif && !root.is-jpeg: HorizontalLayout {
+            padding-top: 5px;
+            spacing: 10px;
+            Switch {
+                text: @tr("透明部分を白背景に合成");
+                checked: composite-white-background;
+                toggled => {
+                    composite-white-background = !composite-white-background;
+                }
             }
         }
 

@@ -6,8 +6,8 @@ use std::rc::Rc;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
-// EditCanvasResizeWindowのfilter-type-indexと対応
-const FILTER_TYPES: [image::imageops::FilterType; 5] = [
+// EditCanvasResizeWindowのfilter-type-index / ExportFileWindowのico-filter-type-indexと対応
+pub(crate) const FILTER_TYPES: [image::imageops::FilterType; 5] = [
     image::imageops::FilterType::Nearest,
     image::imageops::FilterType::Triangle,
     image::imageops::FilterType::CatmullRom,

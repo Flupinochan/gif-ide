@@ -1,11 +1,16 @@
+#
 msgid ""
 msgstr ""
-"Project-Id-Version: gif-ide\n"
+"Project-Id-Version: gif-ide VERSION\n"
 "POT-Creation-Date: 2026-07-04 23:37+0000\n"
-"Language: ja\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
 
 #: ui/app-window.slint:113 ui/app-window.slint:546
 msgctxt "AppWindow"
@@ -136,7 +141,7 @@ msgstr ""
 #: ui/export-file-window.slint:108
 msgctxt "ExportFileWindow"
 msgid "256pxを超える場合は256pxに縮小されます"
-msgstr "256pxを超える場合は256pxに縮小されます"
+msgstr ""
 
 #: ui/export-file-window.slint:118
 msgctxt "ExportFileWindow"
