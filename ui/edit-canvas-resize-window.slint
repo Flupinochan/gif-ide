@@ -20,7 +20,8 @@ export component EditCanvasResizeWindow inherits Window {
     callback start-canvas-resize();
     callback cancel();
 
-    title: @tr("キャンバスサイズを変更");
+    title: @tr("Change Canvas Size");
+    icon: @image-url("assets/window-icon.png");
     default-font-family: Style.font-family;
     height: self.preferred-height;
 
@@ -45,7 +46,7 @@ export component EditCanvasResizeWindow inherits Window {
                 }
 
                 Text {
-                    text: @tr("リサイズに成功しました");
+                    text: @tr("Resize succeeded");
                     vertical-alignment: center;
                     color: Colors.darkgreen;
                 }
@@ -69,7 +70,7 @@ export component EditCanvasResizeWindow inherits Window {
             }
 
             Text {
-                text: @tr("幅 (px)");
+                text: @tr("Width (px)");
                 vertical-alignment: center;
             }
         }
@@ -91,7 +92,7 @@ export component EditCanvasResizeWindow inherits Window {
             }
 
             Text {
-                text: @tr("高さ (px)");
+                text: @tr("Height (px)");
                 vertical-alignment: center;
             }
         }
@@ -107,7 +108,7 @@ export component EditCanvasResizeWindow inherits Window {
             }
 
             Text {
-                text: @tr("補間方式");
+                text: @tr("Interpolation method");
                 vertical-alignment: center;
             }
         }

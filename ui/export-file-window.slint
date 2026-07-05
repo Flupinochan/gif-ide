@@ -35,7 +35,8 @@ export component ExportFileWindow inherits Window {
 
     // FileDialogと干渉するため設定しないこと
     // always-on-top: true;
-    title: @tr("ファイル出力");
+    title: @tr("File Export");
+    icon: @image-url("assets/window-icon.png");
     default-font-family: Style.font-family;
     height: self.preferred-height;
 
@@ -64,7 +65,7 @@ export component ExportFileWindow inherits Window {
                     }
 
                     Text {
-                        text: @tr("出力に成功しました");
+                        text: @tr("Export succeeded");
                         vertical-alignment: center;
                         color: Colors.darkgreen;
                     }
@@ -79,7 +80,7 @@ export component ExportFileWindow inherits Window {
                     }
 
                     open-text := Text {
-                        text: @tr("開く");
+                        text: @tr("Open");
                         vertical-alignment: center;
                         color: Palette.accent-background;
                     }
@@ -90,7 +91,7 @@ export component ExportFileWindow inherits Window {
         VerticalLayout {
             spacing: 10px;
             Text {
-                text: @tr("形式");
+                text: @tr("Format");
                 font-size: 14px;
                 font-weight: FontWeight.medium;
                 vertical-alignment: center;
@@ -105,7 +106,7 @@ export component ExportFileWindow inherits Window {
             }
 
             if root.is-ico: Text {
-                text: @tr("256pxを超える場合は256pxに縮小されます");
+                text: @tr("Images larger than 256px will be scaled down to 256px");
                 font-size: 12px;
                 color: Palette.foreground.transparentize(0.4);
                 wrap: word-wrap;
@@ -115,7 +116,7 @@ export component ExportFileWindow inherits Window {
         VerticalLayout {
             spacing: 10px;
             Text {
-                text: @tr("保存先");
+                text: @tr("Destination");
                 font-size: 14px;
                 font-weight: FontWeight.medium;
                 vertical-alignment: center;
@@ -141,14 +142,14 @@ export component ExportFileWindow inherits Window {
         if !root.is-gif: VerticalLayout {
             spacing: 10px;
             Text {
-                text: @tr("範囲");
+                text: @tr("Range");
                 font-size: 14px;
                 font-weight: FontWeight.medium;
                 vertical-alignment: center;
             }
 
             SelectionGroup {
-                options: [@tr("現在のフレーム"), @tr("すべて")];
+                options: [@tr("Current frame"), @tr("All")];
                 selected-index <=> root.range-index;
             }
         }
@@ -163,7 +164,7 @@ export component ExportFileWindow inherits Window {
             }
 
             Text {
-                text: @tr("補間方式");
+                text: @tr("Interpolation method");
                 vertical-alignment: center;
             }
         }
@@ -173,7 +174,7 @@ export component ExportFileWindow inherits Window {
             padding-top: 5px;
             spacing: 10px;
             Switch {
-                text: @tr("透明部分を白背景に合成");
+                text: @tr("Composite transparent areas onto white");
                 checked: composite-white-background;
                 toggled => {
                     composite-white-background = !composite-white-background;
@@ -185,14 +186,14 @@ export component ExportFileWindow inherits Window {
             padding-top: 5px;
             spacing: 10px;
             Switch {
-                text: @tr("ループ");
+                text: @tr("Loop");
                 checked: gif-loop-forever;
                 toggled => {
                     gif-loop-forever = !gif-loop-forever;
                 }
             }
             Switch {
-                text: @tr("サイズ最適化 (不透明な内容のみ効果あり)");
+                text: @tr("Optimize size (opaque content only)");
                 checked: gif-optimize;
                 toggled => {
                     gif-optimize = !gif-optimize;
@@ -207,7 +208,7 @@ export component ExportFileWindow inherits Window {
                 alignment: start;
                 spacing: 8px;
                 Text {
-                    text: @tr("品質");
+                    text: @tr("Quality");
                     font-size: 14px;
                     font-weight: FontWeight.medium;
                     vertical-alignment: center;

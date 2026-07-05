@@ -33,7 +33,7 @@ export component AppWindow inherits Window {
     in property <int> gif-canvas-width: 0;
     in property <int> gif-canvas-height: 0;
     in-out property <length> sidebar-width: 200px;
-    in property <string> current-language: "ja";
+    in property <string> current-language: "en";
     callback import-file();
     callback export-file();
     callback play(int);
@@ -44,6 +44,7 @@ export component AppWindow inherits Window {
     callback switch-language();
 
     title: "GIF IDE";
+    icon: @image-url("assets/window-icon.png");
     default-font-family: Style.font-family;
     preferred-height: 560px;
     preferred-width: 900px;
@@ -110,7 +111,7 @@ export component AppWindow inherits Window {
                     padding: 12px;
 
                     if !is-loading && frames.length == 0: Button {
-                        text: @tr("ファイル選択");
+                        text: @tr("Select file");
                         clicked => root.import-file();
                     }
 
@@ -266,7 +267,7 @@ export component AppWindow inherits Window {
                             }
 
                             apply-delay := Button {
-                                text: @tr("delay一括適用");
+                                text: @tr("Apply delay to all");
                                 enabled: !is-play;
                                 clicked => {
                                     bulk-delay-input.clear-focus();
@@ -427,7 +428,7 @@ export component AppWindow inherits Window {
 
                         // 小見出し
                         Text {
-                            text: @tr("GIF 情報");
+                            text: @tr("GIF Info");
                             font-size: 13px;
                             font-weight: FontWeight.medium;
                             color: Palette.foreground.transparentize(0.3);
@@ -438,7 +439,7 @@ export component AppWindow inherits Window {
                             alignment: space-between;
 
                             Text {
-                                text: @tr("ファイル名");
+                                text: @tr("Filename");
                                 color: Palette.foreground.transparentize(0.5);
                                 vertical-alignment: center;
                             }
@@ -455,7 +456,7 @@ export component AppWindow inherits Window {
                             alignment: space-between;
 
                             Text {
-                                text: @tr("総フレーム数");
+                                text: @tr("Total frames");
                                 color: Palette.foreground.transparentize(0.5);
                                 vertical-alignment: center;
                             }
@@ -472,7 +473,7 @@ export component AppWindow inherits Window {
                             alignment: space-between;
 
                             Text {
-                                text: @tr("サイズ");
+                                text: @tr("Size");
                                 color: Palette.foreground.transparentize(0.5);
                                 vertical-alignment: center;
                             }
@@ -498,7 +499,7 @@ export component AppWindow inherits Window {
 
                         // 小見出し
                         Text {
-                            text: @tr("編集");
+                            text: @tr("Edit");
                             font-size: 13px;
                             font-weight: FontWeight.medium;
                             color: Palette.foreground.transparentize(0.3);
@@ -506,7 +507,7 @@ export component AppWindow inherits Window {
 
                         // キャンバスリサイズ
                         Button {
-                            text: @tr("キャンバスをリサイズ");
+                            text: @tr("Resize canvas");
                             enabled: !is-play && frames.length > 0;
                             clicked => {
                                 root.edit-canvas-resize();
@@ -515,7 +516,7 @@ export component AppWindow inherits Window {
 
                         // 間引く
                         Button {
-                            text: @tr("フレームを間引く");
+                            text: @tr("Drop frames");
                             enabled: !is-play && frames.length > 0;
                             clicked => {
                                 root.edit-frame-drop();
@@ -536,14 +537,14 @@ export component AppWindow inherits Window {
 
                         // 小見出し
                         Text {
-                            text: @tr("入力/出力");
+                            text: @tr("Import/Export");
                             font-size: 13px;
                             font-weight: FontWeight.medium;
                             color: Palette.foreground.transparentize(0.3);
                         }
 
                         Button {
-                            text: @tr("ファイル選択");
+                            text: @tr("Select file");
                             enabled: !is-play;
                             clicked => {
                                 root.import-file();
@@ -551,7 +552,7 @@ export component AppWindow inherits Window {
                         }
 
                         Button {
-                            text: @tr("出力");
+                            text: @tr("Export");
                             primary: true;
                             enabled: !is-play && frames.length > 0;
                             clicked => {

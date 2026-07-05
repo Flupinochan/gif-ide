@@ -8,7 +8,8 @@ export component ImportFileWindow inherits Window {
     callback start-import();
     callback cancel();
 
-    title: @tr("ファイル読み込み");
+    title: @tr("File Import");
+    icon: @image-url("assets/window-icon.png");
     default-font-family: Style.font-family;
     height: self.preferred-height;
 
@@ -19,7 +20,7 @@ export component ImportFileWindow inherits Window {
         VerticalLayout {
             spacing: 10px;
             Text {
-                text: @tr("形式");
+                text: @tr("Format");
                 font-size: 14px;
                 font-weight: FontWeight.medium;
                 vertical-alignment: center;
@@ -37,7 +38,7 @@ export component ImportFileWindow inherits Window {
         VerticalLayout {
             spacing: 10px;
             Text {
-                text: @tr("読み込み元");
+                text: @tr("Source");
                 font-size: 14px;
                 font-weight: FontWeight.medium;
                 vertical-alignment: center;
