@@ -1,3 +1,5 @@
+[![codecov](https://codecov.io/gh/Flupinochan/gif-ide/graph/badge.svg)](https://app.codecov.io/gh/Flupinochan/gif-ide)
+
 # やることリスト
 
 - [svg](https://lucide.dev/icons/skip-forward)
@@ -302,6 +304,24 @@ PNG, JPEGなどのFormatは、Pixel (RGBA) をBytesとしてシリアライズ�
 - PowerToysを終了すると解消する
 
 ## テスト
+
+### カバレッジ計測 (cargo-llvm-cov)
+
+CIでは [.github/workflows/coverage.yml](.github/workflows/coverage.yml) がmainへのpushごとに計測し、[Codecov](https://app.codecov.io/gh/Flupinochan/gif-ide) にアップロードする (READMEのバッジはその結果)
+
+ローカルでの計測:
+
+```powershell
+# 初回のみ (cargoサブコマンドのため Cargo.toml の依存には追加されない)
+cargo install cargo-llvm-cov
+
+cargo llvm-cov            # ターミナルにサマリー表示
+cargo llvm-cov --html     # target/llvm-cov/html/ にHTMLレポート生成
+```
+
+- 計測対象はCIで実行できる通常テストのみ (`#[ignore]` 付きのベンチマークは含まれない)
+- 通常テストは `tests/fixtures/sample.gif` (32x32、4フレーム、ffmpeg testsrcで生成) を使用する
+- `.slint` 側のUIコードは計測対象外 (Rustコードのみ)
 
 ### 画像を `すべて` で出力する際の並行処理のベンチマーク
 
