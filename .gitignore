@@ -22,5 +22,8 @@ ui/test.gif
 # resources
 resources/
 
+# 配布用パッケージ (.github/workflows/release.yml の出力先)
+dist/
+
 # Slint Document
 docs/development

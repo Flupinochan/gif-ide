@@ -94,8 +94,8 @@ impl Ffmpeg {
 
 // 優先: 実行ファイル同階層の `ffmpeg/<name>` / フォールバック (開発時): `CARGO_MANIFEST_DIR/resources/ffmpeg/<name>`
 //
-// TODO: 配布用ビルドではresources/ffmpeg/*.exeを実行ファイルと同階層の`ffmpeg/`に
-//       配置する手順を別途整備する (build.rsでの自動コピーは未対応)
+// 配布用ビルドは `.github/workflows/release.yml` がresources/ffmpeg/*.exeを
+// 実行ファイルと同階層の `ffmpeg/` に配置する
 fn get_ffmpeg_path(name: &str) -> Result<PathBuf> {
     if let Ok(exe_path) = std::env::current_exe() {
         if let Some(dir) = exe_path.parent() {

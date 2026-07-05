@@ -1,0 +1,115 @@
+# 手動実行 (workflow_dispatch) でWindows向け配布パッケージをビルドし、
+# GitHub Releaseを作成 (release note自動生成) してzipを添付する
+#
+# ローカル実行 (actを使用。Release作成はスキップされ、リポジトリのdist/にzipが生成される):
+#   act workflow_dispatch -P windows-latest=-self-hosted --env HOST_DIST_DIR="$PWD\dist"
+# 注意 (ローカル実行):
+# - -b (bind) はホスト直接実行では機能せず、空のワークスペースで実行されてしまうため使わない
+# - actはジョブ終了時にワークスペース (~/.cache/act/<hash>/hostexecutor) を削除するため、
+#   HOST_DIST_DIRで指定したホスト側ディレクトリに成果物をコピーして持ち出す
+#
+# 注意:
+# - shellはpwsh (PowerShell 7) 未導入のローカル環境でも動くようpowershell (5.1) を指定
+# - run内のスクリプトは5.1互換で書く (&&や三項演算子は不可)
+# - run内は文字化け防止のためASCIIのみ (日本語はnameとYAMLコメントに書く)
+name: Release
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  # README記載のFFmpeg公式推奨ビルド (BtbN)。LGPL版のためLICENSE.txt同梱のみで配布可能
+  FFMPEG_ZIP_URL: https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-n8.1-latest-win64-lgpl-8.1.zip
+
+jobs:
+  release:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: powershell
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # tag名・zipファイル名に使うバージョンをCargo.tomlから取得
+      - name: Cargo.tomlからバージョン取得
+        id: version
+        run: |
+          $ErrorActionPreference = "Stop"
+          $version = (Select-String -Path Cargo.toml -Pattern '^version\s*=\s*"([^"]+)"' |
+              Select-Object -First 1).Matches[0].Groups[1].Value
+          if (-not $version) { throw "version not found in Cargo.toml" }
+          # PowerShell 5.1の >> はUTF-16で書き込みGITHUB_OUTPUTを壊すためOut-Fileで明示
+          "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding ascii
+          Write-Host "version: $version"
+
+      # ローカル実行時はresources/ffmpeg/が配置済みならダウンロードを省略
+      - name: ffmpeg (LGPL) のダウンロード
+        run: |
+          $ErrorActionPreference = "Stop"
+          $missing = @("ffmpeg.exe", "ffprobe.exe", "LICENSE.txt") |
+              Where-Object { -not (Test-Path "resources/ffmpeg/$_") }
+          if (-not $missing) {
+              Write-Host "resources/ffmpeg is already set up, skipping download"
+              exit 0
+          }
+          New-Item -ItemType Directory -Force resources/ffmpeg | Out-Null
+          # Invoke-WebRequestはプログレスバー描画が有効だと大幅に遅くなるため無効化
+          $ProgressPreference = "SilentlyContinue"
+          Invoke-WebRequest -Uri $env:FFMPEG_ZIP_URL -OutFile ffmpeg-lgpl.zip
+          Expand-Archive -Path ffmpeg-lgpl.zip -DestinationPath ffmpeg-lgpl
+          $root = Get-ChildItem ffmpeg-lgpl -Directory | Select-Object -First 1
+          Copy-Item "$($root.FullName)\bin\ffmpeg.exe" resources/ffmpeg/
+          Copy-Item "$($root.FullName)\bin\ffprobe.exe" resources/ffmpeg/
+          Copy-Item "$($root.FullName)\LICENSE.txt" resources/ffmpeg/
+          Remove-Item ffmpeg-lgpl.zip -Force
+          Remove-Item ffmpeg-lgpl -Recurse -Force
+
+      - name: releaseビルド
+        run: cargo build --release
+
+      # get_ffmpeg_pathが実行ファイル同階層のffmpeg/を探すため、その構成で組み立てる
+      - name: 配布パッケージの組み立てとzip化
+        run: |
+          $ErrorActionPreference = "Stop"
+          $version = "${{ steps.version.outputs.version }}"
+          if (Test-Path dist/gif-ide) { Remove-Item -Recurse -Force dist/gif-ide }
+          New-Item -ItemType Directory -Force dist/gif-ide/ffmpeg | Out-Null
+          Copy-Item target/release/gif-ide.exe dist/gif-ide/
+          Copy-Item resources/ffmpeg/ffmpeg.exe dist/gif-ide/ffmpeg/
+          Copy-Item resources/ffmpeg/ffprobe.exe dist/gif-ide/ffmpeg/
+          Copy-Item resources/ffmpeg/LICENSE.txt dist/gif-ide/ffmpeg/
+          Compress-Archive -Path dist/gif-ide -DestinationPath "dist/gif-ide-v$version-win64.zip" -Force
+          # releaseビルドはresources/へのフォールバックが無効のため、
+          # ローカルでのcargo run --release用にtarget/release/ffmpeg/にも配置
+          New-Item -ItemType Directory -Force target/release/ffmpeg | Out-Null
+          Copy-Item resources/ffmpeg/ffmpeg.exe, resources/ffmpeg/ffprobe.exe target/release/ffmpeg/
+
+      # actでのローカル実行時のみ: ワークスペースはジョブ終了時に削除されるため、
+      # 成果物をホスト側のdist/ (HOST_DIST_DIRで指定) にコピーして残す
+      - name: ホスト側dist/へ成果物をコピー (act実行時のみ)
+        if: ${{ env.ACT }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          if (-not $env:HOST_DIST_DIR) {
+              Write-Warning "HOST_DIST_DIR is not set. Artifacts in the act workspace will be deleted at job cleanup."
+              Write-Warning 'Run act with: --env HOST_DIST_DIR="$PWD\dist"'
+              exit 0
+          }
+          New-Item -ItemType Directory -Force $env:HOST_DIST_DIR | Out-Null
+          Copy-Item dist/* $env:HOST_DIST_DIR -Recurse -Force
+          Write-Host "Copied artifacts to $env:HOST_DIST_DIR"
+
+      # actでのローカル実行時 (ACT=true) はRelease作成をスキップ
+      - name: Release作成とzip添付
+        if: ${{ !env.ACT }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          $version = "${{ steps.version.outputs.version }}"
+          gh release create "v$version" "dist/gif-ide-v$version-win64.zip" --title "gif-ide v$version" --generate-notes
+          if ($LASTEXITCODE -ne 0) { throw "gh release create failed" }
