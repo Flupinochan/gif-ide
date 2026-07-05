@@ -1,0 +1,37 @@
+# mainへのpushごとにcargo testを実行してカバレッジを計測し、Codecovにアップロードする
+# README.mdのcodecovバッジがこの結果を表示する
+#
+# 事前準備 (初回のみ):
+# - https://app.codecov.io にGitHubアカウントでログインし、このリポジトリを有効化
+# - Codecovが発行するUpload TokenをリポジトリのActions secretsに CODECOV_TOKEN として登録
+name: Coverage
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  coverage:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # rustupが入っていればllvm-tools-previewコンポーネントは初回実行時に自動で追加される
+      - name: cargo-llvm-covのインストール
+        uses: taiki-e/install-action@cargo-llvm-cov
+
+      - name: ビルドキャッシュ
+        uses: Swatinem/rust-cache@v2
+
+      # cargo testを計測付きでビルド・実行し、lcov形式で出力する
+      - name: カバレッジ計測
+        run: cargo llvm-cov --lcov --output-path lcov.info
+
+      - name: Codecovへアップロード
+        uses: codecov/codecov-action@v5
+        with:
+          files: lcov.info
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: true
