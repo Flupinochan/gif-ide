@@ -2,7 +2,7 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: gif-ide VERSION\n"
-"POT-Creation-Date: 2026-07-04 23:37+0000\n"
+"POT-Creation-Date: 2026-07-05 09:46+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -12,193 +12,193 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=1; plural=0;\n"
 
-#: ui/app-window.slint:113 ui/app-window.slint:546
+#: ui/app-window.slint:114 ui/app-window.slint:547
 msgctxt "AppWindow"
-msgid "ファイル選択"
+msgid "Select file"
 msgstr ""
 
-#: ui/app-window.slint:269
+#: ui/app-window.slint:270
 msgctxt "AppWindow"
-msgid "delay一括適用"
+msgid "Apply delay to all"
 msgstr ""
 
-#: ui/app-window.slint:430
+#: ui/app-window.slint:431
 msgctxt "AppWindow"
-msgid "GIF 情報"
+msgid "GIF Info"
 msgstr ""
 
-#: ui/app-window.slint:441
+#: ui/app-window.slint:442
 msgctxt "AppWindow"
-msgid "ファイル名"
+msgid "Filename"
 msgstr ""
 
-#: ui/app-window.slint:458
+#: ui/app-window.slint:459
 msgctxt "AppWindow"
-msgid "総フレーム数"
+msgid "Total frames"
 msgstr ""
 
-#: ui/app-window.slint:475
+#: ui/app-window.slint:476
 msgctxt "AppWindow"
-msgid "サイズ"
+msgid "Size"
 msgstr ""
 
-#: ui/app-window.slint:501
+#: ui/app-window.slint:502
 msgctxt "AppWindow"
-msgid "編集"
+msgid "Edit"
 msgstr ""
 
-#: ui/app-window.slint:509
+#: ui/app-window.slint:510
 msgctxt "AppWindow"
-msgid "キャンバスをリサイズ"
+msgid "Resize canvas"
 msgstr ""
 
-#: ui/app-window.slint:518
+#: ui/app-window.slint:519
 msgctxt "AppWindow"
-msgid "フレームを間引く"
+msgid "Drop frames"
 msgstr ""
 
-#: ui/app-window.slint:539
+#: ui/app-window.slint:540
 msgctxt "AppWindow"
-msgid "入力/出力"
+msgid "Import/Export"
 msgstr ""
 
-#: ui/app-window.slint:554
+#: ui/app-window.slint:555
 msgctxt "AppWindow"
-msgid "出力"
+msgid "Export"
 msgstr ""
 
 #: ui/edit-canvas-resize-window.slint:23
 msgctxt "EditCanvasResizeWindow"
-msgid "キャンバスサイズを変更"
+msgid "Change Canvas Size"
 msgstr ""
 
-#: ui/edit-canvas-resize-window.slint:48
+#: ui/edit-canvas-resize-window.slint:49
 msgctxt "EditCanvasResizeWindow"
-msgid "リサイズに成功しました"
+msgid "Resize succeeded"
 msgstr ""
 
-#: ui/edit-canvas-resize-window.slint:72
+#: ui/edit-canvas-resize-window.slint:73
 msgctxt "EditCanvasResizeWindow"
-msgid "幅 (px)"
+msgid "Width (px)"
 msgstr ""
 
-#: ui/edit-canvas-resize-window.slint:94
+#: ui/edit-canvas-resize-window.slint:95
 msgctxt "EditCanvasResizeWindow"
-msgid "高さ (px)"
+msgid "Height (px)"
 msgstr ""
 
-#: ui/edit-canvas-resize-window.slint:110
+#: ui/edit-canvas-resize-window.slint:111
 msgctxt "EditCanvasResizeWindow"
-msgid "補間方式"
+msgid "Interpolation method"
 msgstr ""
 
 #: ui/edit-frame-drop-window.slint:27
 msgctxt "EditFrameDropWindow"
-msgid "フレームを間引く"
+msgid "Drop frames"
 msgstr ""
 
-#: ui/edit-frame-drop-window.slint:52
+#: ui/edit-frame-drop-window.slint:53
 msgctxt "EditFrameDropWindow"
-msgid "フレームの間引きに成功しました"
+msgid "Frame drop succeeded"
 msgstr ""
 
-#: ui/edit-frame-drop-window.slint:73
+#: ui/edit-frame-drop-window.slint:74
 msgctxt "EditFrameDropWindow"
-msgid " フレームごとに "
+msgid " frames: drop "
 msgstr ""
 
-#: ui/edit-frame-drop-window.slint:85
+#: ui/edit-frame-drop-window.slint:86
 msgctxt "EditFrameDropWindow"
-msgid " フレームを削除"
+msgid " frame"
 msgstr ""
 
-#: ui/edit-frame-drop-window.slint:104
+#: ui/edit-frame-drop-window.slint:105
 msgctxt "EditFrameDropWindow"
-msgid " 番目のフレームから削除開始"
+msgid " (drop starts here)"
 msgstr ""
 
 #. always-on-top: true;
 #: ui/export-file-window.slint:38
 msgctxt "ExportFileWindow"
-msgid "ファイル出力"
+msgid "File Export"
 msgstr ""
 
-#: ui/export-file-window.slint:67
+#: ui/export-file-window.slint:68
 msgctxt "ExportFileWindow"
-msgid "出力に成功しました"
+msgid "Export succeeded"
 msgstr ""
 
-#: ui/export-file-window.slint:82
+#: ui/export-file-window.slint:83
 msgctxt "ExportFileWindow"
-msgid "開く"
+msgid "Open"
 msgstr ""
 
-#: ui/export-file-window.slint:93
+#: ui/export-file-window.slint:94
 msgctxt "ExportFileWindow"
-msgid "形式"
+msgid "Format"
 msgstr ""
 
-#: ui/export-file-window.slint:108
+#: ui/export-file-window.slint:109
 msgctxt "ExportFileWindow"
-msgid "256pxを超える場合は256pxに縮小されます"
+msgid "Images larger than 256px will be scaled down to 256px"
 msgstr ""
 
-#: ui/export-file-window.slint:118
+#: ui/export-file-window.slint:119
 msgctxt "ExportFileWindow"
-msgid "保存先"
+msgid "Destination"
 msgstr ""
 
-#: ui/export-file-window.slint:144
+#: ui/export-file-window.slint:145
 msgctxt "ExportFileWindow"
-msgid "範囲"
+msgid "Range"
 msgstr ""
 
-#: ui/export-file-window.slint:151
+#: ui/export-file-window.slint:152
 msgctxt "ExportFileWindow"
-msgid "現在のフレーム"
+msgid "Current frame"
 msgstr ""
 
-#: ui/export-file-window.slint:151
+#: ui/export-file-window.slint:152
 msgctxt "ExportFileWindow"
-msgid "すべて"
+msgid "All"
 msgstr ""
 
-#: ui/export-file-window.slint:166
+#: ui/export-file-window.slint:167
 msgctxt "ExportFileWindow"
-msgid "補間方式"
+msgid "Interpolation method"
 msgstr ""
 
-#: ui/export-file-window.slint:176
+#: ui/export-file-window.slint:177
 msgctxt "ExportFileWindow"
-msgid "透明部分を白背景に合成"
+msgid "Composite transparent areas onto white"
 msgstr ""
 
-#: ui/export-file-window.slint:188
+#: ui/export-file-window.slint:189
 msgctxt "ExportFileWindow"
-msgid "ループ"
+msgid "Loop"
 msgstr ""
 
-#: ui/export-file-window.slint:195
+#: ui/export-file-window.slint:196
 msgctxt "ExportFileWindow"
-msgid "サイズ最適化 (不透明な内容のみ効果あり)"
+msgid "Optimize size"
 msgstr ""
 
-#: ui/export-file-window.slint:210
+#: ui/export-file-window.slint:211
 msgctxt "ExportFileWindow"
-msgid "品質"
+msgid "Quality"
 msgstr ""
 
 #: ui/import-file-window.slint:11
 msgctxt "ImportFileWindow"
-msgid "ファイル読み込み"
+msgid "File Import"
 msgstr ""
 
-#: ui/import-file-window.slint:22
+#: ui/import-file-window.slint:23
 msgctxt "ImportFileWindow"
-msgid "形式"
+msgid "Format"
 msgstr ""
 
-#: ui/import-file-window.slint:40
+#: ui/import-file-window.slint:41
 msgctxt "ImportFileWindow"
-msgid "読み込み元"
+msgid "Source"
 msgstr ""
