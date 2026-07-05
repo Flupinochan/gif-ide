@@ -471,9 +471,49 @@ mod tests {
         }
     }
 
+    // delayを識別子として使い、どのフレームが残ったかを判別できるようにする
+    fn gif_with_delays(delays: &[u16]) -> GifFile {
+        GifFile {
+            frames: delays
+                .iter()
+                .map(|&d| GifFrame {
+                    pixels: vec![0; 4],
+                    width: 1,
+                    height: 1,
+                    left: 0,
+                    top: 0,
+                    delay: d,
+                    dispose: gif::DisposalMethod::Keep,
+                })
+                .collect(),
+            canvas_width: 1,
+            canvas_height: 1,
+        }
+    }
+
+    fn remaining_delays(gif: &GifFile) -> Vec<u16> {
+        gif.frames.iter().map(|f| f.delay).collect()
+    }
+
+    // ui/edit-frame-drop-window.slintのis-dropと同じ式 (idx % interval == start_index - 1) で
+    // フレームが削除されること (UIの削除予告表示とRust実装の一致) を固定するテスト
     #[test]
     fn retain_frames_removes_expected_frames() {
-        todo!()
+        // デフォルト値 (interval=2, start_index=1): 偶数idxが削除されて半分になる
+        let mut gif = gif_with_delays(&[0, 1, 2, 3, 4, 5]);
+        gif.retain_frames(2, 1, None);
+        assert_eq!(remaining_delays(&gif), vec![1, 3, 5]);
+
+        // interval=3, start_index=2: idx 1, 4, 7が削除される
+        let mut gif = gif_with_delays(&[0, 1, 2, 3, 4, 5, 6, 7]);
+        gif.retain_frames(3, 2, None);
+        assert_eq!(remaining_delays(&gif), vec![0, 2, 3, 5, 6]);
+
+        // start_index == interval (グループ末尾の削除) かつフレーム数が倍数でない場合:
+        // idx 2, 5が削除され、端数グループのidx 6は残る
+        let mut gif = gif_with_delays(&[0, 1, 2, 3, 4, 5, 6]);
+        gif.retain_frames(3, 3, None);
+        assert_eq!(remaining_delays(&gif), vec![0, 1, 3, 4, 6]);
     }
 
     // 並列化前の実装 (比較用に保持)
