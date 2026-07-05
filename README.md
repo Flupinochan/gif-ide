@@ -54,10 +54,6 @@ ffmpeg CLIで行っていた **GIFの軽量化** をGUIツールにして誰で�
 - 背景透過機能
 - 他OS (Mac・Linux) への対応
 
-
-  - ffmpeg binary
-    - [windows 8.1 lgpl](https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-n8.1-latest-win64-lgpl-8.1.zip)
-
 ## ロジックについて
 
 [GUIDE.md](./GUIDE.md) を参照
@@ -128,57 +124,6 @@ cargo llvm-cov
 # target/llvm-cov/html/ にHTMLレポート生成
 cargo llvm-cov --html
 ```
-
-### 画像を「すべて」で出力する際の `並行処理` のパフォーマンス計測
-
-無制限平行はリスクがあるため、goroutineに相当するストリーミング平行で実装
-
-1. 1枚ずつ逐次出力: 並行化なし
-2. 全フレームを一度に並行出力: 同時実行数の制限なし
-3. CPUコア数ごとチャンク分割して並行出力 (旧実装): 「Nコア分処理 → 完了待ち (バリア) → 次のNコア分」を繰り返す
-4. 現在の実装: ストリーミング並行出力。1タスク完了ごとに次の1タスクを即座に投入し、常にCPUコア数分を並行実行 (バリアなし)
-
-実行方法
-
-```powershell
-# GIFファイルのパスは環境変数 `TEST_GIF_PATH` で指定
-$env:TEST_GIF_PATH = "C:\path\to\test.gif"
-cargo test --release compare_export_strategies -- --ignored --nocapture
-```
-
-#### 結果例 (31フレーム、CPU論理コア数 = 8)
-
-| 戦略                                  | 所要時間 |
-| ------------------------------------- | -------- |
-| 1. 1枚ずつ逐次出力                    | 48.49ms  |
-| 2. 全フレーム並行出力 (無制限)        | 32.60ms  |
-| 3. CPUコア数ごとチャンク並行 (旧実装) | 24.89ms  |
-| 4. ストリーミング並行 (現在の実装)    | 24.53ms  |
-
-#### 結果例 (221フレーム、CPU論理コア数 = 8)
-
-| 戦略                                  | 所要時間 |
-| ------------------------------------- | -------- |
-| 1. 1枚ずつ逐次出力                    | 434.75ms |
-| 2. 全フレーム並行出力 (無制限)        | 151.02ms |
-| 3. CPUコア数ごとチャンク並行 (旧実装) | 312.99ms |
-| 4. ストリーミング並行 (現在の実装)    | 231.03ms |
-
-#### 出力が表示されない場合 (PowerShell)
-
-ファイルにリダイレクトして確認
-
-```powershell
-cargo test --release compare_export_strategies -- --ignored --nocapture *> bench_output.txt
-Get-Content bench_output.txt
-```
-
-## Coding Rule
-
-- UI側で有効な値のみRustに渡す
-  - Rust callback は **有効なインデックスを受け取って画像を表示する** という単一責任になる
-    - "Make illegal states unrepresentable" の原則
-    - Rust callback に無効なインデックスを渡せない構造にすると、**防御的な else ブランチが不要になる**
 
 ## UIスレッドを止めないために
 
