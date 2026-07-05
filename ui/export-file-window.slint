@@ -192,6 +192,7 @@ export component ExportFileWindow inherits Window {
                     gif-loop-forever = !gif-loop-forever;
                 }
             }
+
             Switch {
                 text: @tr("Optimize size (opaque content only)");
                 checked: gif-optimize;
@@ -260,6 +261,7 @@ export component ExportFileWindow inherits Window {
                 Spinner {
                     indeterminate: true;
                 }
+
                 if root.progress-total > 0: Text {
                     text: root.progress-current + " / " + root.progress-total;
                     vertical-alignment: center;

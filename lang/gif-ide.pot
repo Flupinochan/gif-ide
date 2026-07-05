@@ -180,7 +180,7 @@ msgstr ""
 
 #: ui/export-file-window.slint:196
 msgctxt "ExportFileWindow"
-msgid "Optimize size"
+msgid "Optimize size (opaque content only)"
 msgstr ""
 
 #: ui/export-file-window.slint:211

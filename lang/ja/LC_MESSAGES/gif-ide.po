@@ -175,8 +175,8 @@ msgstr "ループ"
 
 #: ui/export-file-window.slint:196
 msgctxt "ExportFileWindow"
-msgid "Optimize size"
-msgstr "サイズ最適化"
+msgid "Optimize size (opaque content only)"
+msgstr "サイズ最適化 (不透明なコンテンツのみ)"
 
 #: ui/export-file-window.slint:211
 msgctxt "ExportFileWindow"

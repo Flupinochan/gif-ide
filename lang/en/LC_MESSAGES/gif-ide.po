@@ -175,8 +175,8 @@ msgstr "Loop"
 
 #: ui/export-file-window.slint:196
 msgctxt "ExportFileWindow"
-msgid "Optimize size"
-msgstr "Optimize size"
+msgid "Optimize size (opaque content only)"
+msgstr "Optimize size (opaque content only)"
 
 #: ui/export-file-window.slint:211
 msgctxt "ExportFileWindow"
