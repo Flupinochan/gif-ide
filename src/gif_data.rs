@@ -418,6 +418,64 @@ mod tests {
     use super::*;
     use std::time::Instant;
 
+    // CIでも実行できるテスト用フィクスチャGIF (32x32、4フレーム、ffmpeg testsrcで生成)
+    fn load_fixture() -> GifFile {
+        let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/sample.gif");
+        GifFile::new(&path).expect("フィクスチャGIFの読み込みに失敗")
+    }
+
+    #[test]
+    fn new_reads_fixture_gif() {
+        let gif = load_fixture();
+        assert_eq!(gif.canvas_width, 32);
+        assert_eq!(gif.canvas_height, 32);
+        assert_eq!(gif.frames.len(), 4);
+        for frame in &gif.frames {
+            assert_eq!(
+                frame.pixels.len(),
+                frame.width as usize * frame.height as usize * 4
+            );
+        }
+    }
+
+    #[test]
+    fn export_roundtrip_preserves_structure() {
+        let gif = load_fixture();
+        let out = std::env::temp_dir().join("gif_ide_test_export_roundtrip.gif");
+        let delays: Vec<u16> = gif.frames.iter().map(|f| f.delay).collect();
+        gif.export(&out, true, &delays, None).expect("exportに失敗");
+
+        let reloaded = GifFile::new(&out).expect("export結果の再読み込みに失敗");
+        let _ = std::fs::remove_file(&out);
+
+        assert_eq!(reloaded.canvas_width, gif.canvas_width);
+        assert_eq!(reloaded.canvas_height, gif.canvas_height);
+        assert_eq!(reloaded.frames.len(), gif.frames.len());
+        let reloaded_delays: Vec<u16> = reloaded.frames.iter().map(|f| f.delay).collect();
+        assert_eq!(reloaded_delays, delays);
+    }
+
+    #[test]
+    fn resize_canvas_updates_dimensions() {
+        let mut gif = load_fixture();
+        gif.resize_canvas(16, 16, image::imageops::FilterType::Nearest, None);
+
+        assert_eq!(gif.canvas_width, 16);
+        assert_eq!(gif.canvas_height, 16);
+        for frame in &gif.frames {
+            assert!(frame.width <= 16 && frame.height <= 16);
+            assert_eq!(
+                frame.pixels.len(),
+                frame.width as usize * frame.height as usize * 4
+            );
+        }
+    }
+
+    #[test]
+    fn retain_frames_removes_expected_frames() {
+        todo!()
+    }
+
     // 並列化前の実装 (比較用に保持)
     fn resize_canvas_sequential(
         gif: &mut GifFile,
