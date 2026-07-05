@@ -12,7 +12,55 @@
 
 ## Build
 
-`resources/ffmpeg/ffmpeg.exe` はリポジトリにpushしていないため、ダウンロードして梱包してビルドすること
+### 開発ビルド
+
+`resources/ffmpeg/*.exe` はリポジトリにpushしていないため、初回に配置が必要。
+後述の [ローカルでのリリースビルド](#ローカルでのリリースビルド-act) を一度実行すると `resources/ffmpeg/` に配置される (以降はダウンロードを省略して再利用される)
+
+```powershell
+cargo run
+```
+
+debugビルドは `resources/ffmpeg/` へのフォールバックがあるため、これだけで動作する
+
+### リリース (GitHub Actions)
+
+GitHubのActionsタブから `Release` workflowを手動実行 (workflow_dispatch) すると、以下が自動で行われる
+
+1. ffmpeg (LGPL版) のダウンロード
+2. `cargo build --release`
+3. 配布パッケージの組み立てとzip化
+4. GitHub Releaseの作成 (release note自動生成) とzipの添付 (tag: `v<version>`)
+
+workflow定義: [.github/workflows/release.yml](.github/workflows/release.yml)
+
+### ローカルでのリリースビルド (act)
+
+[act](https://github.com/nektos/act) で同じworkflowをローカル実行できる。Release作成のみスキップされ、`dist/` にzipが生成される
+
+```powershell
+# 初回のみ (Docker不要。-P windows-latest=-self-hosted でホスト上で直接実行するため)
+winget install nektos.act
+
+act workflow_dispatch -P windows-latest=-self-hosted --env HOST_DIST_DIR="$PWD\dist"
+```
+
+以下が生成される。zipを展開してそのまま配布可能 (翻訳はバイナリに同梱済みのため、追加ファイルはffmpegのみ)
+
+```
+dist/
+├── gif-ide/
+│   ├── gif-ide.exe          # releaseビルド (LTO有効)
+│   └── ffmpeg/
+│       ├── ffmpeg.exe       # 実行ファイル同階層のffmpeg/を実行時に探す
+│       ├── ffprobe.exe
+│       └── LICENSE.txt      # LGPL準拠のため同梱必須
+└── gif-ide-v<version>-win64.zip
+```
+
+- ffmpegは [BtbN FFmpeg-Builds](https://github.com/BtbN/FFmpeg-Builds) の **LGPL版** を使用 (GPL版だとアプリ全体にGPLが及ぶため不可)。リポジトリにはバイナリを含めず、workflowが毎回ダウンロードする
+- releaseビルドは `resources/ffmpeg/` へのフォールバックが無効 (`#[cfg(debug_assertions)]`)。`cargo run --release` 用に `target/release/ffmpeg/` へのコピーもworkflowが行う
+- actはワークスペース (`~/.cache/act/<hash>/hostexecutor`) にリポジトリをコピーして実行し、ジョブ終了時に削除する。`--env HOST_DIST_DIR="$PWD\dist"` を指定すると成果物がリポジトリの `dist/` にコピーされて残る (未指定だと成果物ごと削除されるので注意)
 
 ## Coding Rule
 

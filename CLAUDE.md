@@ -14,12 +14,14 @@ Cargo.toml の dependencies / build-dependencies に新しい依存関係を勝�
 
 ### ファイル構成
 
-| ファイル   | 説明              |
-| ---------- | ----------------- |
-| lang/      | 翻訳・多言語対応  |
-| ui/        | slintを使用したUI |
-| ui/preview | 動作確認用        |
-| src/       | Rustロジック      |
+| ファイル         | 説明                                                    |
+| ---------------- | ------------------------------------------------------- |
+| lang/            | 翻訳・多言語対応                                        |
+| ui/              | slintを使用したUI                                       |
+| ui/preview       | 動作確認用                                              |
+| src/             | Rustロジック                                            |
+| .github/workflows | 配布用ビルドとRelease作成 (release.yml、actでローカル実行可) |
+| resources/ffmpeg | 同梱するffmpegバイナリ (git管理外、workflowで配置)      |
 
 ### データフロー方針
 
