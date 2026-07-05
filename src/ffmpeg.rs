@@ -1,6 +1,16 @@
 use anyhow::Result;
+use std::os::windows::process::CommandExt;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
+
+// コンソールウィンドウを表示せずに子プロセスを起動するCommandを生成する
+// https://learn.microsoft.com/windows/win32/procthread/process-creation-flags
+const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+fn hidden_command(path: &Path) -> Command {
+    let mut command = Command::new(path);
+    command.creation_flags(CREATE_NO_WINDOW);
+    command
+}
 
 pub(crate) struct Ffmpeg {
     ffmpeg_path: PathBuf,
@@ -17,7 +27,7 @@ impl Ffmpeg {
 
     // ffprobeによる動画メタデータ (解像度・フレームレート) の取得
     pub(crate) fn get_video_metadata(&self, path: &Path) -> Result<VideoMetadata> {
-        let output = Command::new(&self.ffprobe_path)
+        let output = hidden_command(&self.ffprobe_path)
             .args([
                 "-loglevel",
                 "error",
@@ -43,7 +53,7 @@ impl Ffmpeg {
 
     // ffmpegで動画を生のRGBAフレーム列に変換するプロセスを起動
     pub(crate) fn spawn_raw_frames(&self, path: &Path) -> Result<Child> {
-        Ok(Command::new(&self.ffmpeg_path)
+        Ok(hidden_command(&self.ffmpeg_path)
             .args(["-loglevel", "error"])
             .arg("-i")
             .arg(path)
@@ -67,7 +77,7 @@ impl Ffmpeg {
     ) -> Result<Child> {
         let loop_value = if loop_forever { "0" } else { "-1" };
 
-        Ok(Command::new(&self.ffmpeg_path)
+        Ok(hidden_command(&self.ffmpeg_path)
             .args(["-loglevel", "error"])
             .args(["-f", "concat"])
             .args(["-safe", "0"])
