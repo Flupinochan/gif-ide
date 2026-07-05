@@ -189,3 +189,54 @@ fn parse_ffprobe_output(output: &str) -> Result<VideoMetadata> {
         delay,
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_ffprobe_output_reads_metadata() {
+        let meta = parse_ffprobe_output("width=1920\nheight=1080\nr_frame_rate=25/1\n").unwrap();
+        assert_eq!(meta.width, 1920);
+        assert_eq!(meta.height, 1080);
+        // 25fps -> 100/25 = 4 (1/100秒単位)
+        assert_eq!(meta.delay, 4);
+    }
+
+    // NTSC系の分数フレームレート (29.97fps) も1/100秒単位に丸められる
+    #[test]
+    fn parse_ffprobe_output_rounds_fractional_frame_rate() {
+        let meta =
+            parse_ffprobe_output("width=640\nheight=480\nr_frame_rate=30000/1001\n").unwrap();
+        assert_eq!(meta.delay, 3);
+    }
+
+    // fps=0の場合はデフォルトのdelay=10にフォールバックする
+    #[test]
+    fn parse_ffprobe_output_falls_back_on_zero_fps() {
+        let meta = parse_ffprobe_output("width=640\nheight=480\nr_frame_rate=0/1\n").unwrap();
+        assert_eq!(meta.delay, 10);
+    }
+
+    // key=value形式でない行や未知のkeyは無視される
+    #[test]
+    fn parse_ffprobe_output_ignores_unknown_lines() {
+        let meta = parse_ffprobe_output(
+            "codec_name=h264\nnonsense line\nwidth=320\nheight=240\nr_frame_rate=50/1\n",
+        )
+        .unwrap();
+        assert_eq!(meta.width, 320);
+        assert_eq!(meta.height, 240);
+        assert_eq!(meta.delay, 2);
+    }
+
+    #[test]
+    fn parse_ffprobe_output_rejects_incomplete_metadata() {
+        // width欠落
+        assert!(parse_ffprobe_output("height=480\nr_frame_rate=25/1\n").is_err());
+        // フレームレートの分母が0
+        assert!(parse_ffprobe_output("width=640\nheight=480\nr_frame_rate=25/0\n").is_err());
+        // 数値としてパースできないwidth
+        assert!(parse_ffprobe_output("width=abc\nheight=480\nr_frame_rate=25/1\n").is_err());
+    }
+}

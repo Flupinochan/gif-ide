@@ -416,12 +416,21 @@ fn resize_frame_pixels(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::time::Instant;
 
     // CIでも実行できるテスト用フィクスチャGIF (32x32、4フレーム、ffmpeg testsrcで生成)
     fn load_fixture() -> GifFile {
         let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/sample.gif");
         GifFile::new(&path).expect("フィクスチャGIFの読み込みに失敗")
+    }
+
+    // exportした結果をデコードし直して返す
+    // テストは並列実行されるため、temp_nameはテストごとに一意にすること
+    fn export_and_reload(gif: &GifFile, delays: &[u16], temp_name: &str) -> GifFile {
+        let out = std::env::temp_dir().join(temp_name);
+        gif.export(&out, true, delays, None).expect("exportに失敗");
+        let reloaded = GifFile::new(&out).expect("export結果の再読み込みに失敗");
+        let _ = std::fs::remove_file(&out);
+        reloaded
     }
 
     #[test]
@@ -441,12 +450,8 @@ mod tests {
     #[test]
     fn export_roundtrip_preserves_structure() {
         let gif = load_fixture();
-        let out = std::env::temp_dir().join("gif_ide_test_export_roundtrip.gif");
         let delays: Vec<u16> = gif.frames.iter().map(|f| f.delay).collect();
-        gif.export(&out, true, &delays, None).expect("exportに失敗");
-
-        let reloaded = GifFile::new(&out).expect("export結果の再読み込みに失敗");
-        let _ = std::fs::remove_file(&out);
+        let reloaded = export_and_reload(&gif, &delays, "gif_ide_test_export_roundtrip.gif");
 
         assert_eq!(reloaded.canvas_width, gif.canvas_width);
         assert_eq!(reloaded.canvas_height, gif.canvas_height);
@@ -516,84 +521,115 @@ mod tests {
         assert_eq!(remaining_delays(&gif), vec![0, 1, 3, 4, 6]);
     }
 
-    // 並列化前の実装 (比較用に保持)
-    fn resize_canvas_sequential(
-        gif: &mut GifFile,
-        new_width: u16,
-        new_height: u16,
-        filter_type: image::imageops::FilterType,
-    ) {
-        let scale_x = new_width as f64 / gif.canvas_width as f64;
-        let scale_y = new_height as f64 / gif.canvas_height as f64;
-
-        for frame in &mut gif.frames {
-            let new_frame_width = ((frame.width as f64 * scale_x).round() as u16)
-                .max(1)
-                .min(new_width);
-            let new_frame_height = ((frame.height as f64 * scale_y).round() as u16)
-                .max(1)
-                .min(new_height);
-            let new_left =
-                ((frame.left as f64 * scale_x).round() as u16).min(new_width - new_frame_width);
-            let new_top =
-                ((frame.top as f64 * scale_y).round() as u16).min(new_height - new_frame_height);
-
-            frame.pixels = resize_frame_pixels(
-                &frame.pixels,
-                frame.width,
-                frame.height,
-                new_frame_width,
-                new_frame_height,
-                filter_type,
-            );
-            frame.width = new_frame_width;
-            frame.height = new_frame_height;
-            frame.left = new_left;
-            frame.top = new_top;
+    fn solid_frame(
+        rgba: [u8; 4],
+        width: u16,
+        height: u16,
+        left: u16,
+        top: u16,
+        dispose: gif::DisposalMethod,
+    ) -> GifFrame {
+        GifFrame {
+            pixels: rgba.repeat(width as usize * height as usize),
+            width,
+            height,
+            left,
+            top,
+            delay: 10,
+            dispose,
         }
-
-        gif.canvas_width = new_width;
-        gif.canvas_height = new_height;
     }
 
-    // ui/test.gifを幅1000pxにリサイズする際の、並列化前/後の処理時間比較
-    // 実行: cargo test --release compare_resize_canvas_strategies -- --ignored --nocapture
-    #[ignore = "ローカルのui/test.gifを使うベンチマークのため通常のテストでは実行しない"]
+    // フレーム矩形 (left/top offset) がキャンバス上の正しい位置に合成され、
+    // delayは最低2 (20ms) にクランプされることを検証する
     #[test]
-    fn compare_resize_canvas_strategies() {
-        let gif = GifFile::new(Path::new("ui/test.gif")).expect("test.gifの読み込みに失敗");
+    fn build_frame_buffers_places_frame_at_offset() {
+        let mut frame = solid_frame([10, 20, 30, 255], 2, 2, 1, 2, gif::DisposalMethod::Keep);
+        frame.delay = 0;
+        let gif = GifFile {
+            frames: vec![frame],
+            canvas_width: 4,
+            canvas_height: 4,
+        };
 
-        let new_width: u16 = 1000;
-        let new_height = ((new_width as f64) * gif.canvas_height as f64 / gif.canvas_width as f64)
-            .round() as u16;
+        let buffers = gif.build_frame_buffers();
+        assert_eq!(buffers.len(), 1);
+        let (buffer, delay) = &buffers[0];
+        assert_eq!(*delay, 2);
 
-        println!(
-            "frame count: {}, {}x{} -> {}x{}",
-            gif.frames.len(),
-            gif.canvas_width,
-            gif.canvas_height,
-            new_width,
-            new_height
-        );
+        let bytes = buffer.as_bytes();
+        for row in 0..4usize {
+            for col in 0..4usize {
+                let px = &bytes[(row * 4 + col) * 4..][..4];
+                let inside = (1..=2).contains(&col) && (2..=3).contains(&row);
+                if inside {
+                    assert_eq!(px, [10, 20, 30, 255]);
+                } else {
+                    assert_eq!(px, [0, 0, 0, 0]);
+                }
+            }
+        }
+    }
 
-        let mut sequential_gif = gif.clone();
-        let start = Instant::now();
-        resize_canvas_sequential(
-            &mut sequential_gif,
-            new_width,
-            new_height,
-            image::imageops::FilterType::Lanczos3,
-        );
-        println!("逐次 (並列化前): {:?}", start.elapsed());
+    // Background disposalのフレームは書き出し後にその領域が透明へ戻ることを検証する。
+    // パレット量子化の影響を受けにくいよう白/黒のみを使い、輝度で判定する
+    #[test]
+    fn export_clears_canvas_after_background_disposal() {
+        let gif = GifFile {
+            frames: vec![
+                solid_frame(
+                    [255, 255, 255, 255],
+                    4,
+                    4,
+                    0,
+                    0,
+                    gif::DisposalMethod::Background,
+                ),
+                solid_frame([0, 0, 0, 255], 2, 2, 1, 1, gif::DisposalMethod::Keep),
+            ],
+            canvas_width: 4,
+            canvas_height: 4,
+        };
+        let reloaded = export_and_reload(&gif, &[10, 10], "gif_ide_test_export_background.gif");
 
-        let mut parallel_gif = gif.clone();
-        let start = Instant::now();
-        parallel_gif.resize_canvas(
-            new_width,
-            new_height,
-            image::imageops::FilterType::Lanczos3,
-            None,
-        );
-        println!("並列 (rayon, 並列化後): {:?}", start.elapsed());
+        assert_eq!(reloaded.frames.len(), 2);
+        // 1フレーム目: 全面白
+        assert!(reloaded.frames[0]
+            .pixels
+            .chunks(4)
+            .all(|px| px[0] > 127 && px[3] == 255));
+        // 2フレーム目: (1,1)は黒、(0,0)はBackground disposalにより透明へ戻っている
+        let f2 = &reloaded.frames[1];
+        let px_at = |x: usize, y: usize| &f2.pixels[(y * f2.width as usize + x) * 4..][..4];
+        assert!(px_at(1, 1)[0] < 128 && px_at(1, 1)[3] == 255);
+        assert_eq!(px_at(0, 0)[3], 0);
+    }
+
+    // Previous disposalのフレームは書き出し後にキャンバスが直前の状態へ戻ることを検証する
+    #[test]
+    fn export_restores_canvas_after_previous_disposal() {
+        let gif = GifFile {
+            frames: vec![
+                solid_frame([255, 255, 255, 255], 4, 4, 0, 0, gif::DisposalMethod::Keep),
+                solid_frame([0, 0, 0, 255], 4, 4, 0, 0, gif::DisposalMethod::Previous),
+                // 全透明フレーム: キャンバスへ何も描かないため、直前のキャンバス状態がそのまま出力される
+                solid_frame([0, 0, 0, 0], 4, 4, 0, 0, gif::DisposalMethod::Keep),
+            ],
+            canvas_width: 4,
+            canvas_height: 4,
+        };
+        let reloaded = export_and_reload(&gif, &[10, 10, 10], "gif_ide_test_export_previous.gif");
+
+        assert_eq!(reloaded.frames.len(), 3);
+        // 2フレーム目は黒
+        assert!(reloaded.frames[1]
+            .pixels
+            .chunks(4)
+            .all(|px| px[0] < 128 && px[3] == 255));
+        // 3フレーム目: Previous disposalで白 (1フレーム目の状態) へ戻っている
+        assert!(reloaded.frames[2]
+            .pixels
+            .chunks(4)
+            .all(|px| px[0] > 127 && px[3] == 255));
     }
 }
