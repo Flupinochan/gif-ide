@@ -1,4 +1,4 @@
-[![codecov](https://codecov.io/gh/Flupinochan/gif-ide/graph/badge.svg)](https://app.codecov.io/gh/Flupinochan/gif-ide)
+[![codecov](https://codecov.io/gh/Flupinochan/gif-ide/graph/badge.svg?token=2v7YK8XmlH)](https://codecov.io/gh/Flupinochan/gif-ide)
 
 # やることリスト
 
