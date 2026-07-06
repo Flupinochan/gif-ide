@@ -88,6 +88,26 @@ jobs:
           New-Item -ItemType Directory -Force target/release/ffmpeg | Out-Null
           Copy-Item resources/ffmpeg/ffmpeg.exe, resources/ffmpeg/ffprobe.exe target/release/ffmpeg/
 
+      - name: Inno Setup のインストール
+        run: |
+          $ErrorActionPreference = "Stop"
+          $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+          if (Test-Path $iscc) {
+              Write-Host "Inno Setup is already installed, skipping"
+              exit 0
+          }
+          choco install innosetup -y --no-progress
+          if ($LASTEXITCODE -ne 0) { throw "choco install innosetup failed" }
+
+      # インストーラはdist/gif-ide/ (配布パッケージ組み立て) に依存するためその後に実行する
+      - name: インストーラのビルド
+        run: |
+          $ErrorActionPreference = "Stop"
+          $version = "${{ steps.version.outputs.version }}"
+          $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+          & $iscc "/DMyAppVersion=$version" "installer\gif-ide.iss"
+          if ($LASTEXITCODE -ne 0) { throw "ISCC.exe failed" }
+
       # actでのローカル実行時のみ: ワークスペースはジョブ終了時に削除されるため、
       # 成果物をホスト側のdist/ (HOST_DIST_DIRで指定) にコピーして残す
       - name: ホスト側dist/へ成果物をコピー (act実行時のみ)
@@ -104,12 +124,15 @@ jobs:
           Write-Host "Copied artifacts to $env:HOST_DIST_DIR"
 
       # actでのローカル実行時 (ACT=true) はRelease作成をスキップ
-      - name: Release作成とzip添付
+      - name: Release作成と成果物添付
         if: ${{ !env.ACT }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           $ErrorActionPreference = "Stop"
           $version = "${{ steps.version.outputs.version }}"
-          gh release create "v$version" "dist/gif-ide-v$version-win64.zip" --title "gif-ide v$version" --generate-notes
+          gh release create "v$version" `
+              "dist/gif-ide-v$version-win64.zip" `
+              "dist/gif-ide-v$version-win64-setup.exe" `
+              --title "gif-ide v$version" --generate-notes
           if ($LASTEXITCODE -ne 0) { throw "gh release create failed" }

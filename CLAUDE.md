@@ -33,6 +33,7 @@ GIF export、差分矩形、Disposal Method、並行処理まわりを触る前�
 | GUIDE.md          | GIF・画像・ffmpegのドメイン知識                                                             |
 | .github/workflows | 配布用ビルドとRelease作成 (release.yml、actでローカル実行可)、カバレッジ計測 (coverage.yml) |
 | resources/ffmpeg  | 同梱するffmpegバイナリ (git管理外、workflowで配置)                                          |
+| installer/        | Windows向けインストーラ (Inno Setup、.iss) 一式                                            |
 
 ## Coding Rule
 
