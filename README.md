@@ -107,6 +107,8 @@ dist/
 └── gif-ide-v<version>-win64.zip
 ```
 
+Microsoft Storeへは、Releaseに添付された `gif-ide-v<version>-x64.msix` を手動でダウンロードし、[Partner Center](https://partner.microsoft.com/dashboard) にアップロードして提出する
+
 ## テスト手順
 
 ### カバレッジ計測
