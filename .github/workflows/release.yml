@@ -108,6 +108,14 @@ jobs:
           & $iscc "/DMyAppVersion=$version" "installer\gif-ide.iss"
           if ($LASTEXITCODE -ne 0) { throw "ISCC.exe failed" }
 
+      # Microsoft Store提出用MSIX (未署名) のビルド。署名は審査通過後にStoreが行うため不要
+      # 提出は手動: Releaseからmsixをダウンロードし、Partner Centerにアップロードする
+      - name: MSIXパッケージのビルド
+        run: |
+          $ErrorActionPreference = "Stop"
+          powershell -NoProfile -ExecutionPolicy Bypass -File installer\build-msix.ps1
+          if ($LASTEXITCODE -ne 0) { throw "build-msix.ps1 failed" }
+
       # actでのローカル実行時のみ: ワークスペースはジョブ終了時に削除されるため、
       # 成果物をホスト側のdist/ (HOST_DIST_DIRで指定) にコピーして残す
       - name: ホスト側dist/へ成果物をコピー (act実行時のみ)
@@ -134,5 +142,6 @@ jobs:
           gh release create "v$version" `
               "dist/gif-ide-v$version-win64.zip" `
               "dist/gif-ide-v$version-win64-setup.exe" `
+              "dist/gif-ide-v$version-x64.msix" `
               --title "gif-ide v$version" --generate-notes
           if ($LASTEXITCODE -ne 0) { throw "gh release create failed" }
