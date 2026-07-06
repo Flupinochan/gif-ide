@@ -218,3 +218,7 @@ window.on_some_action(move || {
 同じHTTPやファイルI/Oでも、ライブラリが非同期API (Futureを返す) か同期API (呼び出したスレッドをブロックする) かで使い分けが変わる
 
 例: `reqwest::get` は非同期だが `reqwest::blocking::get` は同期
+
+## プライバシーポリシー
+
+[プライバシーポリシー](https://flupinochan.github.io/gif-ide/privacy-policy)
