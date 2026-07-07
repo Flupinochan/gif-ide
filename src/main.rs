@@ -37,7 +37,16 @@ fn main() -> Result<()> {
     let rt = tokio::runtime::Runtime::new()?;
     let _guard = rt.enter();
 
-    let ui = AppWindow::new()?;
+    // VM/RDP環境等、GPUドライバが無くOpenGLの初期化に失敗する場合があるため、
+    // その際はソフトウェアレンダラーにフォールバックする
+    let ui = match AppWindow::new() {
+        Ok(ui) => ui,
+        Err(_) => {
+            // Safety: イベントループ開始前のシングルスレッド区間でのみ設定する
+            unsafe { std::env::set_var("SLINT_BACKEND", "winit-software") };
+            AppWindow::new()?
+        }
+    };
     let _ = slint::select_bundled_translation(ui.get_current_language().as_str());
     crate::i18n::IS_ENGLISH.store(
         ui.get_current_language() == "en",
