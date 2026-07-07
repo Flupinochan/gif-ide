@@ -141,6 +141,9 @@ jobs:
         run: |
           $ErrorActionPreference = "Stop"
           $version = "${{ steps.version.outputs.version }}"
+          # 同バージョンでの再リリース時、既存タグが古いコミットを指したままにならないよう
+          # 既存のタグ/リリースがあれば削除してから作り直す (無ければ何もしない)
+          gh release delete "v$version" --yes --cleanup-tag 2>$null
           gh release create "v$version" `
               "dist/gif-ide-v$version-win64.zip" `
               "dist/gif-ide-v$version-win64-setup.exe" `

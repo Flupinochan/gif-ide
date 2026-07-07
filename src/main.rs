@@ -37,16 +37,7 @@ fn main() -> Result<()> {
     let rt = tokio::runtime::Runtime::new()?;
     let _guard = rt.enter();
 
-    // VM/RDP環境等、GPUドライバが無くOpenGLの初期化に失敗する場合があるため、
-    // その際はソフトウェアレンダラーにフォールバックする
-    let ui = match AppWindow::new() {
-        Ok(ui) => ui,
-        Err(_) => {
-            // Safety: イベントループ開始前のシングルスレッド区間でのみ設定する
-            unsafe { std::env::set_var("SLINT_BACKEND", "winit-software") };
-            AppWindow::new()?
-        }
-    };
+    let ui = AppWindow::new()?;
     let _ = slint::select_bundled_translation(ui.get_current_language().as_str());
     crate::i18n::IS_ENGLISH.store(
         ui.get_current_language() == "en",
@@ -65,7 +56,22 @@ fn main() -> Result<()> {
     edit_frame_drop_window::register_callbacks(&ui, &edit_frame_drop_window, &gif_file_ref);
     edit_canvas_resize_window::register_callbacks(&ui, &edit_canvas_resize_window, &gif_file_ref);
 
-    ui.run()?;
+    if let Err(err) = ui.run() {
+        // VM/RDP環境等、GPUドライバが無くOpenGLの初期化に失敗する場合がある。
+        // 実際の初期化はui.run()のイベントループ開始後に行われ、かつSlintは
+        // 一度確定したプラットフォームを同一プロセス内で切り替えられないため、
+        // ソフトウェアレンダラーを強制する環境変数を付けて自プロセスを再起動する
+        const RETRY_GUARD: &str = "GIF_IDE_SOFTWARE_RENDERER_RETRY";
+        if std::env::var_os(RETRY_GUARD).is_none() {
+            let exe = std::env::current_exe()?;
+            let status = std::process::Command::new(exe)
+                .env("SLINT_BACKEND", "winit-software")
+                .env(RETRY_GUARD, "1")
+                .status()?;
+            std::process::exit(status.code().unwrap_or(1));
+        }
+        return Err(err.into());
+    }
 
     Ok(())
 }
