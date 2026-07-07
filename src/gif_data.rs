@@ -275,7 +275,9 @@ impl GifFile {
         let child = ffmpeg.spawn_gif_encoder(&manifest_path, loop_forever, final_delay, path)?;
         let output = child.wait_with_output()?;
 
-        let _ = std::fs::remove_dir_all(&temp_dir);
+        if let Err(e) = std::fs::remove_dir_all(&temp_dir) {
+            tracing::warn!(error = %e, path = %temp_dir.display(), "failed to remove temp export dir");
+        }
 
         if !output.status.success() {
             return Err(anyhow::anyhow!(

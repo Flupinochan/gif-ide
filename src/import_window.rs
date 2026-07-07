@@ -85,15 +85,20 @@ pub(crate) fn register_callbacks(
                 import_video_file().await
             };
 
-            let _ = slint::invoke_from_event_loop(move || {
-                let Some(import_window) = import_window_weak_select_import_path.upgrade() else {
-                    return;
-                };
-                if let Some(path) = path {
-                    import_window
-                        .set_import_path(SharedString::from(path.to_string_lossy().into_owned()));
-                }
-            });
+            crate::logging::warn_on_err(
+                slint::invoke_from_event_loop(move || {
+                    let Some(import_window) = import_window_weak_select_import_path.upgrade()
+                    else {
+                        return;
+                    };
+                    if let Some(path) = path {
+                        import_window.set_import_path(SharedString::from(
+                            path.to_string_lossy().into_owned(),
+                        ));
+                    }
+                }),
+                "invoke_from_event_loop failed (select import path)",
+            );
         });
     });
 
@@ -134,32 +139,35 @@ pub(crate) fn register_callbacks(
                 (gif_file, buffers)
             });
 
-            let _ = slint::invoke_from_event_loop(move || {
-                let Some(ui) = ui_weak_start_import.upgrade() else {
-                    return;
-                };
-                ui.set_is_loading(false);
-                match result {
-                    Ok((gif_file, buffers)) => {
-                        apply_gif_file_to_ui(&ui, &gif_file, filename, buffers);
-                        *gif_ref.lock().unwrap() = Some(gif_file);
+            crate::logging::warn_on_err(
+                slint::invoke_from_event_loop(move || {
+                    let Some(ui) = ui_weak_start_import.upgrade() else {
+                        return;
+                    };
+                    ui.set_is_loading(false);
+                    match result {
+                        Ok((gif_file, buffers)) => {
+                            apply_gif_file_to_ui(&ui, &gif_file, filename, buffers);
+                            *gif_ref.lock().unwrap() = Some(gif_file);
+                        }
+                        Err(e) => {
+                            let label = crate::i18n::t(
+                                if format_index == 0 { "GIF" } else { "動画" },
+                                if format_index == 0 { "GIF" } else { "video" },
+                            );
+                            show_message_dialog(
+                                crate::i18n::error_title(),
+                                crate::i18n::t(
+                                    &format!("{label}の読み込みに失敗しました: {e}"),
+                                    &format!("Failed to load {label}: {e}"),
+                                ),
+                                &ui,
+                            );
+                        }
                     }
-                    Err(e) => {
-                        let label = crate::i18n::t(
-                            if format_index == 0 { "GIF" } else { "動画" },
-                            if format_index == 0 { "GIF" } else { "video" },
-                        );
-                        show_message_dialog(
-                            crate::i18n::error_title(),
-                            crate::i18n::t(
-                                &format!("{label}の読み込みに失敗しました: {e}"),
-                                &format!("Failed to load {label}: {e}"),
-                            ),
-                            &ui,
-                        );
-                    }
-                }
-            });
+                }),
+                "invoke_from_event_loop failed (import result)",
+            );
         });
     });
 

@@ -26,6 +26,7 @@ macro_rules! show_window {
 pub(crate) use show_window;
 
 pub(crate) fn show_message_dialog(title: &str, message: &str, parent: &AppWindow) {
+    tracing::error!(title = %title, dialog_message = %message, "showing error dialog to user");
     let dialog = MessageDialog::new().unwrap();
     dialog.set_title_text(SharedString::from(title));
     dialog.set_message(SharedString::from(message));

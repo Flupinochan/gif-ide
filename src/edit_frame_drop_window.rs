@@ -84,11 +84,14 @@ pub(crate) fn register_callbacks(
                     }
                     last_reported = n;
                     let drop_window_weak_progress = drop_window_weak_progress.clone();
-                    let _ = slint::invoke_from_event_loop(move || {
-                        if let Some(w) = drop_window_weak_progress.upgrade() {
-                            w.set_progress_current(n as i32);
-                        }
-                    });
+                    crate::logging::warn_on_err(
+                        slint::invoke_from_event_loop(move || {
+                            if let Some(w) = drop_window_weak_progress.upgrade() {
+                                w.set_progress_current(n as i32);
+                            }
+                        }),
+                        "invoke_from_event_loop failed (frame drop progress)",
+                    );
                 }),
             );
 
@@ -102,33 +105,36 @@ pub(crate) fn register_callbacks(
             // 3. バッファ構築後にユーザーが delay を編集しても GifFile に書き込まれる
             *gif_ref_drop.lock().unwrap() = Some(gif);
 
-            let _ = slint::invoke_from_event_loop({
-                let gif_ref_drop = gif_ref_drop.clone();
-                move || {
-                    let Some(gif) = gif_ref_drop.lock().unwrap().take() else {
-                        return;
-                    };
-                    let (Some(ui), Some(drop_window)) =
-                        (ui_weak.upgrade(), drop_window_weak.upgrade())
-                    else {
-                        // ウィンドウが閉じられた場合でも gif を復元する
-                        *gif_ref_drop.lock().unwrap() = Some(gif);
-                        return;
-                    };
+            crate::logging::warn_on_err(
+                slint::invoke_from_event_loop({
+                    let gif_ref_drop = gif_ref_drop.clone();
+                    move || {
+                        let Some(gif) = gif_ref_drop.lock().unwrap().take() else {
+                            return;
+                        };
+                        let (Some(ui), Some(drop_window)) =
+                            (ui_weak.upgrade(), drop_window_weak.upgrade())
+                        else {
+                            // ウィンドウが閉じられた場合でも gif を復元する
+                            *gif_ref_drop.lock().unwrap() = Some(gif);
+                            return;
+                        };
 
-                    let frame_data = frame_data_from_buffers(buffers);
-                    let new_len = frame_data.len() as i32;
-                    ui.set_frames(ModelRc::from(Rc::new(VecModel::from(frame_data))));
-                    if new_len > 0 {
-                        ui.set_selected_frame_index(
-                            ui.get_selected_frame_index().clamp(0, new_len - 1),
-                        );
+                        let frame_data = frame_data_from_buffers(buffers);
+                        let new_len = frame_data.len() as i32;
+                        ui.set_frames(ModelRc::from(Rc::new(VecModel::from(frame_data))));
+                        if new_len > 0 {
+                            ui.set_selected_frame_index(
+                                ui.get_selected_frame_index().clamp(0, new_len - 1),
+                            );
+                        }
+                        drop_window.set_current_total_frames(new_len);
+                        *gif_ref_drop.lock().unwrap() = Some(gif);
+                        drop_window.set_state(LoadingState::Success);
                     }
-                    drop_window.set_current_total_frames(new_len);
-                    *gif_ref_drop.lock().unwrap() = Some(gif);
-                    drop_window.set_state(LoadingState::Success);
-                }
-            });
+                }),
+                "invoke_from_event_loop failed (frame drop result)",
+            );
         });
     });
 }

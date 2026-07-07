@@ -177,9 +177,13 @@ fn open_in_explorer(path: &std::path::Path) {
     use std::os::windows::process::CommandExt;
     use std::process::Command;
 
-    let _ = Command::new("explorer")
-        .raw_arg(format!("/select,\"{}\"", path.display()))
-        .spawn();
+    crate::logging::warn_on_err(
+        Command::new("explorer")
+            .raw_arg(format!("/select,\"{}\"", path.display()))
+            .spawn()
+            .map(|_| ()),
+        "failed to open explorer",
+    );
 }
 
 #[cfg(not(windows))]
@@ -290,11 +294,14 @@ pub(crate) fn register_callbacks(
                         }
                         last_reported = n;
                         let export_window_weak_progress = export_window_weak_progress.clone();
-                        let _ = slint::invoke_from_event_loop(move || {
-                            if let Some(w) = export_window_weak_progress.upgrade() {
-                                w.set_progress_current(n as i32);
-                            }
-                        });
+                        crate::logging::warn_on_err(
+                            slint::invoke_from_event_loop(move || {
+                                if let Some(w) = export_window_weak_progress.upgrade() {
+                                    w.set_progress_current(n as i32);
+                                }
+                            }),
+                            "invoke_from_event_loop failed (gif export progress)",
+                        );
                     };
 
                     let result = if optimize {
@@ -303,25 +310,30 @@ pub(crate) fn register_callbacks(
                         gif.export(&path, loop_forever, &delays, Some(&mut on_progress))
                     };
 
-                    let _ = slint::invoke_from_event_loop(move || match result {
-                        Ok(()) => {
-                            if let Some(export_window) = export_window_weak_start_export.upgrade() {
-                                export_window.set_state(LoadingState::Success);
+                    crate::logging::warn_on_err(
+                        slint::invoke_from_event_loop(move || match result {
+                            Ok(()) => {
+                                if let Some(export_window) =
+                                    export_window_weak_start_export.upgrade()
+                                {
+                                    export_window.set_state(LoadingState::Success);
+                                }
                             }
-                        }
-                        Err(e) => {
-                            if let Some(ui) = ui_weak_start_export.upgrade() {
-                                show_message_dialog(
-                                    crate::i18n::error_title(),
-                                    crate::i18n::t(
-                                        &format!("GIFの出力に失敗しました: {}", e),
-                                        &format!("Failed to export GIF: {}", e),
-                                    ),
-                                    &ui,
-                                );
+                            Err(e) => {
+                                if let Some(ui) = ui_weak_start_export.upgrade() {
+                                    show_message_dialog(
+                                        crate::i18n::error_title(),
+                                        crate::i18n::t(
+                                            &format!("GIFの出力に失敗しました: {}", e),
+                                            &format!("Failed to export GIF: {}", e),
+                                        ),
+                                        &ui,
+                                    );
+                                }
                             }
-                        }
-                    });
+                        }),
+                        "invoke_from_event_loop failed (gif export result)",
+                    );
                 });
             }
             ExportJob::Image { buffers, settings } => {
@@ -354,11 +366,14 @@ pub(crate) fn register_callbacks(
                                 completed += 1;
                                 let export_window_weak_progress =
                                     export_window_weak_progress.clone();
-                                let _ = slint::invoke_from_event_loop(move || {
-                                    if let Some(w) = export_window_weak_progress.upgrade() {
-                                        w.set_progress_current(completed as i32);
-                                    }
-                                });
+                                crate::logging::warn_on_err(
+                                    slint::invoke_from_event_loop(move || {
+                                        if let Some(w) = export_window_weak_progress.upgrade() {
+                                            w.set_progress_current(completed as i32);
+                                        }
+                                    }),
+                                    "invoke_from_event_loop failed (image export progress)",
+                                );
                                 spawn_next_encode_task(
                                     &mut set,
                                     &mut next_index,
@@ -368,6 +383,7 @@ pub(crate) fn register_callbacks(
                                 )
                             }
                             Err(e) => {
+                                tracing::warn!(error = %e, "image encode task failed");
                                 if result.is_ok() {
                                     result = Err(e);
                                 }
@@ -375,25 +391,30 @@ pub(crate) fn register_callbacks(
                         }
                     }
 
-                    let _ = slint::invoke_from_event_loop(move || match result {
-                        Ok(()) => {
-                            if let Some(export_window) = export_window_weak_start_export.upgrade() {
-                                export_window.set_state(LoadingState::Success);
+                    crate::logging::warn_on_err(
+                        slint::invoke_from_event_loop(move || match result {
+                            Ok(()) => {
+                                if let Some(export_window) =
+                                    export_window_weak_start_export.upgrade()
+                                {
+                                    export_window.set_state(LoadingState::Success);
+                                }
                             }
-                        }
-                        Err(e) => {
-                            if let Some(ui) = ui_weak_start_export.upgrade() {
-                                show_message_dialog(
-                                    crate::i18n::error_title(),
-                                    crate::i18n::t(
-                                        &format!("画像の出力に失敗しました: {}", e),
-                                        &format!("Failed to export image: {}", e),
-                                    ),
-                                    &ui,
-                                );
+                            Err(e) => {
+                                if let Some(ui) = ui_weak_start_export.upgrade() {
+                                    show_message_dialog(
+                                        crate::i18n::error_title(),
+                                        crate::i18n::t(
+                                            &format!("画像の出力に失敗しました: {}", e),
+                                            &format!("Failed to export image: {}", e),
+                                        ),
+                                        &ui,
+                                    );
+                                }
                             }
-                        }
-                    });
+                        }),
+                        "invoke_from_event_loop failed (image export result)",
+                    );
                 });
             }
         }
@@ -431,15 +452,20 @@ pub(crate) fn register_callbacks(
                 save_image_file(format_index - 1).await
             };
 
-            let _ = slint::invoke_from_event_loop(move || {
-                let Some(export_window) = export_window_weak_select_export_path.upgrade() else {
-                    return;
-                };
-                if let Some(path) = path {
-                    export_window
-                        .set_export_path(SharedString::from(path.to_string_lossy().into_owned()));
-                }
-            });
+            crate::logging::warn_on_err(
+                slint::invoke_from_event_loop(move || {
+                    let Some(export_window) = export_window_weak_select_export_path.upgrade()
+                    else {
+                        return;
+                    };
+                    if let Some(path) = path {
+                        export_window.set_export_path(SharedString::from(
+                            path.to_string_lossy().into_owned(),
+                        ));
+                    }
+                }),
+                "invoke_from_event_loop failed (select export path)",
+            );
         });
     });
 

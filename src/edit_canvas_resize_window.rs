@@ -86,11 +86,14 @@ pub(crate) fn register_callbacks(
             while !done_watch.load(Ordering::Relaxed) {
                 let n = progress_watch.load(Ordering::Relaxed) as i32;
                 let resize_window_weak_progress = resize_window_weak_progress.clone();
-                let _ = slint::invoke_from_event_loop(move || {
-                    if let Some(w) = resize_window_weak_progress.upgrade() {
-                        w.set_progress_current(n);
-                    }
-                });
+                crate::logging::warn_on_err(
+                    slint::invoke_from_event_loop(move || {
+                        if let Some(w) = resize_window_weak_progress.upgrade() {
+                            w.set_progress_current(n);
+                        }
+                    }),
+                    "invoke_from_event_loop failed (canvas resize progress)",
+                );
                 // TODO: 更新間隔は好みで調整 (現在50ms)
                 std::thread::sleep(std::time::Duration::from_millis(50));
             }
@@ -110,23 +113,26 @@ pub(crate) fn register_callbacks(
 
             let buffers = gif.build_frame_buffers();
 
-            let _ = slint::invoke_from_event_loop(move || {
-                let (Some(ui), Some(resize_window)) =
-                    (ui_weak.upgrade(), resize_window_weak.upgrade())
-                else {
-                    return;
-                };
+            crate::logging::warn_on_err(
+                slint::invoke_from_event_loop(move || {
+                    let (Some(ui), Some(resize_window)) =
+                        (ui_weak.upgrade(), resize_window_weak.upgrade())
+                    else {
+                        return;
+                    };
 
-                let frame_data = frame_data_from_buffers(buffers);
-                ui.set_frames(ModelRc::from(Rc::new(VecModel::from(frame_data))));
-                ui.set_gif_canvas_width(new_width);
-                ui.set_gif_canvas_height(new_height);
+                    let frame_data = frame_data_from_buffers(buffers);
+                    ui.set_frames(ModelRc::from(Rc::new(VecModel::from(frame_data))));
+                    ui.set_gif_canvas_width(new_width);
+                    ui.set_gif_canvas_height(new_height);
 
-                *gif_ref_resize.lock().unwrap() = Some(gif);
+                    *gif_ref_resize.lock().unwrap() = Some(gif);
 
-                resize_window.set_progress_current(total as i32);
-                resize_window.set_state(LoadingState::Success);
-            });
+                    resize_window.set_progress_current(total as i32);
+                    resize_window.set_state(LoadingState::Success);
+                }),
+                "invoke_from_event_loop failed (canvas resize result)",
+            );
         });
     });
 }

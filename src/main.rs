@@ -9,6 +9,7 @@ mod ffmpeg;
 mod gif_data;
 mod i18n;
 mod import_window;
+mod logging;
 mod window;
 
 use anyhow::Result;
@@ -28,7 +29,20 @@ pub(crate) fn half_parallelism() -> usize {
     .max(1)
 }
 
-fn main() -> Result<()> {
+fn main() -> std::process::ExitCode {
+    logging::init();
+    tracing::info!(version = env!("CARGO_PKG_VERSION"), "starting gif-ide");
+
+    match run() {
+        Ok(()) => std::process::ExitCode::SUCCESS,
+        Err(e) => {
+            tracing::error!(error = ?e, "gif-ide exited with an error");
+            std::process::ExitCode::FAILURE
+        }
+    }
+}
+
+fn run() -> Result<()> {
     rayon::ThreadPoolBuilder::new()
         .num_threads(half_parallelism())
         .build_global()
@@ -38,7 +52,10 @@ fn main() -> Result<()> {
     let _guard = rt.enter();
 
     let ui = AppWindow::new()?;
-    let _ = slint::select_bundled_translation(ui.get_current_language().as_str());
+    logging::warn_on_err(
+        slint::select_bundled_translation(ui.get_current_language().as_str()),
+        "select_bundled_translation failed",
+    );
     crate::i18n::IS_ENGLISH.store(
         ui.get_current_language() == "en",
         std::sync::atomic::Ordering::Relaxed,
@@ -63,6 +80,7 @@ fn main() -> Result<()> {
         // ソフトウェアレンダラーを強制する環境変数を付けて自プロセスを再起動する
         const RETRY_GUARD: &str = "GIF_IDE_SOFTWARE_RENDERER_RETRY";
         if std::env::var_os(RETRY_GUARD).is_none() {
+            tracing::error!(error = %err, "ui.run() failed, retrying with software renderer");
             let exe = std::env::current_exe()?;
             let status = std::process::Command::new(exe)
                 .env("SLINT_BACKEND", "winit-software")
