@@ -8,6 +8,7 @@
 #   - built app:      target\release\gif-ide.exe (cargo build --release)
 #   - ffmpeg bins:    resources\ffmpeg\{ffmpeg.exe, ffprobe.exe, LICENSE.txt}
 #   - Windows SDK:    makeappx.exe / signtool.exe
+#   - Visual Studio:  vswhere.exe / dumpbin.exe (used by copy-vcredist.ps1)
 #
 # Notes:
 #   - The MSIX uploaded to Partner Center must be UNSIGNED (or the signature is
@@ -48,6 +49,11 @@ New-Item -ItemType Directory -Force "$layout\ffmpeg", "$layout\Assets" | Out-Nul
 
 Copy-Item $SourceExe "$layout\"
 Copy-Item "$FfmpegDir\ffmpeg.exe", "$FfmpegDir\ffprobe.exe", "$FfmpegDir\LICENSE.txt" "$layout\ffmpeg\"
+
+# Side-by-side deploy the VC++ runtime DLLs so the app runs without the
+# Visual C++ Redistributable pre-installed (see copy-vcredist.ps1 for details)
+powershell -NoProfile -ExecutionPolicy Bypass -File "$PSScriptRoot\copy-vcredist.ps1" -SourceExe "$layout\gif-ide.exe" -DestDir $layout
+if ($LASTEXITCODE -ne 0) { throw "copy-vcredist.ps1 failed" }
 
 # Generate logo assets from the app icon (128x128) with ffmpeg
 $ff = "$FfmpegDir\ffmpeg.exe"

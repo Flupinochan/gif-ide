@@ -82,6 +82,8 @@ jobs:
           Copy-Item resources/ffmpeg/ffmpeg.exe dist/gif-ide/ffmpeg/
           Copy-Item resources/ffmpeg/ffprobe.exe dist/gif-ide/ffmpeg/
           Copy-Item resources/ffmpeg/LICENSE.txt dist/gif-ide/ffmpeg/
+          powershell -NoProfile -ExecutionPolicy Bypass -File installer\copy-vcredist.ps1 -SourceExe dist\gif-ide\gif-ide.exe -DestDir dist\gif-ide
+          if ($LASTEXITCODE -ne 0) { throw "copy-vcredist.ps1 failed" }
           Compress-Archive -Path dist/gif-ide -DestinationPath "dist/gif-ide-v$version-win64.zip" -Force
           # releaseビルドはresources/へのフォールバックが無効のため、
           # ローカルでのcargo run --release用にtarget/release/ffmpeg/にも配置

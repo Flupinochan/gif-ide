@@ -4,6 +4,8 @@
 
 GIFを再生・編集・出力するGUIツール
 
+![screenshot](./docs/screenshot.png)
+
 ## モチベーション
 
 ffmpeg CLIで行っていた **GIFの軽量化** をGUIツールにして誰でも簡単に行えるようにしたかった

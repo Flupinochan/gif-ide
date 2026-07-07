@@ -5,8 +5,9 @@
 
   NOTE (Store submission): Identity Name / Publisher and PublisherDisplayName
   must exactly match the values shown in Partner Center under
-  "Product management" > "Product identity". Replace them before submitting.
-  The current Publisher (CN=Flupinochan) is for local self-signed testing.
+  "Product management" > "Product identity" (current values are set below).
+  Local install testing via build-msix.ps1 -CertThumbprint requires a
+  self-signed certificate whose Subject equals the Publisher value below.
 -->
 <Package
     xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
@@ -15,14 +16,14 @@
     IgnorableNamespaces="uap rescap">
 
   <Identity
-      Name="Flupinochan.gif-ide"
-      Publisher="CN=Flupinochan"
+      Name="MetalMental.GIF-IDE"
+      Publisher="CN=3C60EF58-65BB-49C9-A680-D10CF22EF565"
       Version="$VERSION$.0"
       ProcessorArchitecture="x64" />
 
   <Properties>
-    <DisplayName>gif-ide</DisplayName>
-    <PublisherDisplayName>Flupinochan</PublisherDisplayName>
+    <DisplayName>GIF-IDE</DisplayName>
+    <PublisherDisplayName>MetalMental</PublisherDisplayName>
     <Logo>Assets\StoreLogo.png</Logo>
   </Properties>
 
@@ -38,7 +39,7 @@
   <Applications>
     <Application Id="gifide" Executable="gif-ide.exe" EntryPoint="Windows.FullTrustApplication">
       <uap:VisualElements
-          DisplayName="gif-ide"
+          DisplayName="GIF-IDE"
           Description="GIF player and editor"
           BackgroundColor="transparent"
           Square150x150Logo="Assets\Square150x150Logo.png"
